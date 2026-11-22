@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SL Diagnostic Center — Book Tests & Download Reports</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- PDF Library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<style>
+    :root{
+        --bg:#F6F8FB; --surface:#FFFFFF; --surface-2:#F1F5F9; --text:#0F172A; --text-soft:#64748B;
+        --border:#E6EAF1; --shadow:0 10px 30px -12px rgba(15,23,42,0.12);
+        --hero-1:#070C18; --hero-2:#101B34; --hero-3:#0B213E;
+        --emerald:#10B981; --emerald-d:#059669; --blue:#3B82F6; --amber:#F59E0B;
+        --radius-lg:22px; --radius-md:14px; --radius-sm:10px;
+    }
+    html[data-theme="dark"]{
+        --bg:#080D18; --surface:#111a2c; --surface-2:#16213a; --text:#EAF0FA; --text-soft:#8B97AF;
+        --border:#22304d; --shadow:0 10px 30px -12px rgba(0,0,0,0.5);
+    }
+    *{box-sizing:border-box;}
+    body{ margin:0; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased; transition:background .3s ease, color .3s ease; }
+    h1,h2,h3,.display{ font-family:'Poppins',sans-serif; letter-spacing:-0.02em; }
+    .eyebrow{ font-family:'Inter',sans-serif; font-size:12px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--emerald); }
+    a{ text-decoration:none; color:inherit; }
+    .wrap{ max-width:1140px; margin:0 auto; padding:0 22px; }
+    button{ font-family:inherit; cursor:pointer; }
+
+    /* ===== NAV ===== */
+    .nav{ position:sticky; top:0; z-index:200; backdrop-filter:blur(14px); background:rgba(7,12,24,0.85); border-bottom:1px solid rgba(255,255,255,0.08); }
+    .nav-inner{ display:flex; align-items:center; justify-content:space-between; padding:14px 22px; max-width:1140px; margin:0 auto; flex-wrap: wrap; gap:10px;}
+    .brand{ display:flex; align-items:center; gap:10px; color:#fff; font-weight:700; font-size:16px; }
+    .brand-mark{ width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg,var(--emerald),#0EA5E9); display:flex; align-items:center; justify-content:center; }
+    .nav-actions{ display:flex; align-items:center; gap:10px; flex-wrap: wrap;}
+    
+    .btn-nav { display:flex; align-items:center; gap:6px; color:#fff; font-size:13px; font-weight:600; padding:9px 16px; border-radius:20px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); transition: 0.2s;}
+    .btn-nav:hover { background:rgba(255,255,255,0.2); }
+    .btn-nav.highlight { background: linear-gradient(135deg, #8B5CF6, #6D28D9); border:none; }
+    .btn-nav.cart { background: var(--emerald); border:none; }
+    
+    .admin-dash-btn { display:none; background:#F59E0B; color:#000; font-size:13px; font-weight:700; padding:9px 16px; border-radius:20px; border:none; text-decoration:none; }
+    .admin-on .admin-dash-btn { display:flex; align-items:center; gap:5px;}
+
+    /* ===== HERO ===== */
+    .hero{ position:relative; background:radial-gradient(120% 140% at 50% -10%, var(--hero-3), var(--hero-1) 65%); overflow:hidden; padding:40px 22px 30px; text-align:center; color:#fff; }
+    .hero-badges{ display:flex; justify-content:center; gap:10px; margin-bottom:15px; flex-wrap:wrap; }
+    .badge-pill{ font-size:10.5px; font-weight:600; padding:6px 12px; border-radius:20px; display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.14); color:#CBD5E1; }
+    .hero h1{ font-size:26px; font-weight:800; margin:6px 0 8px; }
+    .hero .loc{ color:#93A2BE; font-size:13px; display:flex; align-items:center; justify-content:center; gap:6px; margin-bottom:10px; }
+    
+    .pulse-wrap{ width:100%; max-width:280px; margin:15px auto 0; opacity:0.9; }
+    .pulse-wrap svg{ width:100%; height:auto; display:block; }
+    .pulse-line{ stroke-dasharray:1400; stroke-dashoffset:1400; animation:draw 3.2s ease-in-out infinite; }
+    @keyframes draw{ 0%{stroke-dashoffset:1400;} 55%{stroke-dashoffset:0;} 100%{stroke-dashoffset:-1400;} }
+
+
+    /* ===== SECTIONS ===== */
+    .section{ padding:50px 0; }
+    .section-head{ text-align:center; max-width:600px; margin:0 auto 34px; }
+    .section-head h2{ font-size:30px; font-weight:800; margin:8px 0 8px; }
+    .section-head p{ color:var(--text-soft); font-size:14.5px; line-height:1.6; margin:0; }
+
+    /* ===== PACKAGES ===== */
+    .pkg-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:20px; }
+    .pkg-card{ background:var(--surface); border-radius:var(--radius-lg); overflow:hidden; box-shadow:var(--shadow); border:1px solid var(--border); display:flex; flex-direction:column; position:relative; }
+    .pkg-photo{ height:148px; background:linear-gradient(135deg,#0f2b59,#2f6fe4); display:flex; align-items:center; justify-content:center; overflow:hidden; color:#fff; font-size:42px; }
+    .pkg-photo img{ width:100%; height:100%; object-fit:cover; }
+    .pkg-category{ font-size:10px; font-weight:800; letter-spacing:.08em; opacity:.78; text-transform:uppercase; margin-bottom:6px; }
+    .pkg-offer{ margin:0 0 10px; color:var(--emerald-d); font-size:11px; font-weight:700; }
+    .pkg-count{ display:inline-block; margin:0 0 12px; padding:4px 8px; color:var(--blue); background:rgba(59,130,246,.10); border-radius:20px; font-size:10px; font-weight:700; }
+    .pkg-more{ margin:0 0 10px; color:var(--text-soft); font-size:11px; cursor:pointer; }
+    .pkg-more summary{ color:var(--blue); font-weight:700; }
+    .pkg-head{ padding:20px 20px 46px; color:#fff; position:relative; }
+    .pkg-badge{ position:absolute; top:16px; right:16px; background:rgba(255,255,255,0.22); backdrop-filter:blur(6px); font-size:10.5px; font-weight:700; padding:5px 11px; border-radius:20px; letter-spacing:0.04em; }
+    .pkg-head h3{ font-size:18px; font-weight:700; margin:4px 30px 6px 0; line-height:1.3; }
+    .pkg-head p{ font-size:12.5px; opacity:0.88; margin:0; line-height:1.5; }
+    .pkg-body{ padding:18px 20px 20px; flex:1; display:flex; flex-direction:column; }
+    .pkg-list{ list-style:none; margin:0 0 16px; padding:0; display:flex; flex-direction:column; gap:8px; }
+    .pkg-list li{ display:flex; align-items:flex-start; gap:8px; font-size:13px; color:var(--text); }
+    .pkg-price-row{ margin-top:auto; border-top:1px dashed var(--border); padding-top:14px; display:flex; align-items:flex-end; justify-content:space-between; gap:10px; }
+    .pkg-mrp{ font-size:12.5px; color:#94A3B8; text-decoration:line-through; }
+    .pkg-special{ font-size:26px; font-weight:800; font-family:'Poppins',sans-serif; color:var(--text); }
+    .pkg-book{ width:100%; margin-top:14px; background:var(--surface-2); color:var(--emerald-d); border:2px solid var(--emerald); padding:10px; border-radius:12px; font-weight:700; font-size:13.5px; transition:0.2s;}
+    .pkg-book:hover{ background:var(--emerald); color:#fff; }
+    .pkg-compare{ width:100%; margin-top:8px; padding:8px; color:var(--blue); background:transparent; border:1px solid var(--border); border-radius:10px; font-size:12px; font-weight:700; }
+    .pkg-compare.selected{ color:#fff; background:var(--blue); border-color:var(--blue); }
+    .compare-bar{ position:sticky; bottom:14px; z-index:110; display:none; align-items:center; justify-content:space-between; gap:12px; max-width:640px; margin:18px auto 0; padding:11px 14px; background:#0F172A; color:#fff; border-radius:14px; box-shadow:0 14px 28px rgba(15,23,42,.28); font-size:12px; }
+    .compare-bar button{ padding:8px 12px; border:0; border-radius:9px; background:var(--emerald); color:#fff; font-weight:800; }
+    .compare-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; }
+    .compare-card{ padding:14px; background:var(--surface-2); border:1px solid var(--border); border-radius:13px; }
+    .compare-card h4{ margin:0 0 4px; font-size:14px; line-height:1.35; }
+    .compare-price{ margin:8px 0 12px; color:var(--emerald-d); font-size:19px; font-weight:800; }
+    .compare-card ul{ list-style:none; padding:0; margin:0; display:grid; gap:7px; }
+    .compare-card li{ font-size:11px; line-height:1.35; }
+    .compare-extra{ display:inline-block; margin-left:4px; padding:2px 5px; border-radius:10px; background:rgba(16,185,129,.13); color:var(--emerald-d); font-size:8px; font-weight:800; text-transform:uppercase; }
+    
+    .admin-on .pkg-admin-del{ display:flex; }
+    .pkg-admin-del{ position:absolute; top:16px; left:16px; width:28px; height:28px; border-radius:50%; background:rgba(0,0,0,0.5); color:#fff; border:none; font-size:14px; display:none; align-items:center; justify-content:center; cursor:pointer;}
+    .pkg-admin-edit { position:absolute; top:16px; left:50px; width:28px; height:28px; border-radius:50%; background:rgba(255,255,255,0.9); color:#000; border:none; font-size:14px; display:none; align-items:center; justify-content:center; cursor:pointer;}
+    .admin-on .pkg-admin-edit { display:flex; }
+
+    .add-pkg-card{ border:2px dashed var(--border); border-radius:var(--radius-lg); display:none; align-items:center; justify-content:center; flex-direction:column; gap:8px; color:var(--text-soft); min-height:220px; background:transparent; cursor:pointer;}
+    .admin-on .add-pkg-card{ display:flex; }
+    .add-pkg-card:hover{ border-color:var(--emerald); color:var(--emerald); }
+
+    /* ===== TEST SEARCH ===== */
+    .test-toolbar{ background:var(--surface); border-radius:var(--radius-lg); box-shadow:var(--shadow); border:1px solid var(--border); padding:24px 26px; margin-bottom:26px; display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; }
+    .search-box{ position:relative; width:340px; max-width:100%; }
+    .search-box input{ width:100%; padding:12px 16px 12px 42px; border-radius:24px; border:1px solid var(--border); background:var(--surface-2); font-size:13.5px; color:var(--text); outline:none; }
+    
+    .test-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; }
+    .test-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:16px 18px; display:flex; align-items:center; justify-content:space-between; gap:10px; box-shadow:0 4px 14px -8px rgba(15,23,42,0.08); }
+    .test-name{ font-weight:600; font-size:13.5px; margin-bottom:4px; }
+    .test-rate{ color:var(--emerald-d); font-weight:700; font-size:14px; }
+    .test-book{ background:#E7F8F0; color:var(--emerald-d); border:none; padding:8px 14px; border-radius:18px; font-size:12px; font-weight:700; cursor:pointer;}
+    .test-book:hover{ background:var(--emerald); color:#fff; }
+
+    /* ===== MODALS ===== */
+    .overlay{ position:fixed; inset:0; background:rgba(6,10,20,0.6); z-index:500; display:none; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(3px); }
+    .modal{ background:var(--surface); color:var(--text); width:100%; max-width:450px; border-radius:18px; padding:26px; box-shadow:0 30px 60px rgba(0,0,0,0.3); max-height:90vh; overflow-y:auto;}
+    .modal.wide{ max-width:700px; }
+    .modal h3{ margin:0 0 15px; font-size:18px; }
+    .modal label{ font-size:11.5px; font-weight:700; color:var(--text-soft); text-transform:uppercase; display:block; margin:14px 0 5px; }
+    .modal input[type=text], .modal input[type=password], .modal input[type=number]{ width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:10px; font-size:13.5px; background:var(--surface-2); color:var(--text); outline:none; }
+    .modal-actions{ display:flex; gap:10px; margin-top:22px; }
+    .btn{ flex:1; padding:11px; border-radius:10px; border:none; font-weight:700; font-size:13.5px; }
+    .btn-primary{ background:var(--emerald); color:#fff; }
+    .btn-ghost{ background:var(--surface-2); color:var(--text-soft); }
+    .close-x{ float:right; background:none; border:none; font-size:18px; color:var(--text-soft); cursor:pointer; }
+    
+    .theme-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:6px; }
+    .theme-swatch{ height:34px; border-radius:8px; border:2px solid transparent; cursor:pointer; }
+    .theme-swatch.active{ border-color:var(--text); }
+    
+    .test-pick-list{ max-height:220px; overflow-y:auto; border:1px solid var(--border); border-radius:10px; margin-top:6px; }
+    .test-pick-row{ display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--surface-2); font-size:13px; }
+    
+    /* REPORT RESULTS IN MODAL */
+    .search-flex { display: flex; gap: 10px; }
+    .search-flex input { flex: 1; }
+    .report-item { background: var(--surface-2); padding: 15px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-top:10px; border:1px solid var(--border); flex-wrap: wrap; gap:10px;}
+    .report-info strong { font-size: 15px; color: var(--blue); }
+    .report-info div { font-size: 12px; color: var(--text-soft); margin-top: 4px; }
+    
+    .btn-dl-group { display: flex; gap: 5px; flex-wrap: wrap;}
+    .btn-download { background: #8B5CF6; color: white; border: none; padding: 8px 12px; border-radius: 8px; font-weight: bold; font-size: 12px; cursor: pointer; }
+    .btn-print { background: #3B82F6; color: white; border: none; padding: 8px 12px; border-radius: 8px; font-weight: bold; font-size: 12px; cursor: pointer; }
+
+    /* CART MODAL ITEMS */
+    .cart-item { display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid var(--border); font-size:13px; font-weight:500;}
+    .cart-del { color: red; background:none; border:none; font-weight:bold; cursor:pointer;}
+
+    .admin-strip{ display:none; background:linear-gradient(90deg,#1E293B,#0F172A); color:#F59E0B; text-align:center; font-size:12.5px; font-weight:600; padding:9px; position:sticky; top:0; z-index:250; }
+    .admin-on .admin-strip{ display:block; }
+    #loadingBar{ display:none; position:fixed; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,var(--emerald),var(--blue)); z-index:999; animation:load 1s linear infinite; }
+    @keyframes load{ 0%{transform:translateX(-100%);} 100%{transform:translateX(100%);} }
+
+    /* 🔥 NATIVE PRINT ENGINE CSS */
+    /* 🔥 UNIVERSAL REPORT ENGINE CSS (Print & PDF) */
+    #printableReportArea { display: none; }
+    
+    /* PDF Mode - Takes over the screen safely */
+    body.is-pdf-mode { overflow: visible !important; background: white !important; }
+    body.is-pdf-mode > *:not(#printableReportArea):not(#loadingBar) { display: none !important; }
+    body.is-pdf-mode #printableReportArea {
+        display: block !important;
+        width: 794px !important; /* Fixed A4 pixel width for high-quality PDF */
+        margin: 0 auto;
+        background-color: white;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* Print Mode - Fixes Mobile Letterhead Shifting */
+    @page { size: A4 portrait; margin: 0; } 
+    @media print {
+        body { background: white; color: black; margin: 0; padding: 0; }
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        body > *:not(#printableReportArea) { display: none !important; }
+        #printableReportArea { 
+            display: block !important; 
+            width: 100% !important;
+        }
+        .letterhead-bg { display: none !important; } /* We don't use fixed images anymore */
+    }
+    
+    #printContentWrapper { padding-left: 10mm; padding-right: 10mm; }
+    .fallback-header { display: flex; align-items: center; border-bottom: 3px solid #F57C00; padding-bottom: 8px; margin-bottom: 10px; }
+    .fallback-header h1 { margin: 0; color: #000080; font-size: 20px; }
+    .rep-info-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; border: 2px solid #000; }
+    .rep-info-table td.box-cell { padding: 12px 15px; vertical-align: top; border: 1px solid #000;}
+    .inner-info { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.6; }
+    .inner-info td { border: none !important; padding: 2px 0; }
+    .inner-lbl { width: 110px; font-weight: bold; }
+    .inner-colon { width: 15px; font-weight: bold; }
+    .rep-main-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 12px; }
+    .rep-main-table th { border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 6px 8px; text-align: left; background-color: #f9f9f9 !important; font-size: 13px;}
+    .rep-main-table td { padding: 5px 8px; line-height: 1.4; } 
+    .abnormal-print { color: #DC2626 !important; font-weight: 900 !important; }
+/* 🔥 CENTERED & PREMIUM TEST HEADING DESIGN */
+        .test-category-title { 
+            text-align: center !important; 
+            background-color: #E2E8F0 !important; 
+            color: #1E293B !important; 
+            font-weight: 800 !important; 
+            font-size: 15px !important; 
+            padding: 10px !important; 
+            text-decoration: none !important; 
+            text-transform: uppercase !important;
+            border: 1px solid #CBD5E1 !important;
+            border-left: none !important;
+            border-right: none !important;
+            -webkit-print-color-adjust: exact !important; 
+            print-color-adjust: exact !important; 
+        }
+        
+        </style>
+</head>
+<body>
+
+<div id="loadingBar"></div>
+<div class="admin-strip">🔓 Admin Mode Active — You can edit Prices & Packages directly. Patients cannot see this.</div>
+
+<!-- TOP NAV -->
+<div class="nav">
+    <div class="nav-inner">
+        <div class="brand">
+            <div class="brand-mark">SL</div>
+            <span id="navLabName">SL Diagnostic</span>
+        </div>
+        <div class="nav-actions">
+            <!-- 📄 Download Report Button -->
+            <button class="btn-nav highlight" onclick="openModal('reportModal')">📄 Download Reports</button>
+            
+            <!-- 🛒 Cart Button -->
+            <button class="btn-nav cart" onclick="openModal('cartModal')">🛒 Cart (<span id="cartCount">0</span>)</button>
+            
+            <button class="icon-btn" onclick="toggleTheme()">🌙</button>
+            
+            <!-- Partner / Admin access -->
+            <button class="btn-nav" id="staffLoginBtn" onclick="openPortalLogin()">Partner / Admin Login</button>
+            <a href="index.html" class="admin-dash-btn">⚙️ Go to Dashboard</a>
+        </div>
+    </div>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+    <div class="hero-badges">
+        <div class="badge-pill">🛡️ NABL Lab Standards</div>
+        <div class="badge-pill">⚡ Safe & Accurate Reports</div>
+    </div>
+    <h1 id="heroLabName">SL DIAGNOSTIC CENTER</h1>
+    <div class="loc">📍 <span id="heroAddress">Near Old Bus Stand, Bahadurgarh</span></div>
+    
+    <div class="pulse-wrap">
+        <svg viewBox="0 0 640 90" xmlns="http://www.w3.org/2000/svg">
+            <path class="pulse-line" d="M0 45 H220 L245 10 L270 80 L290 45 H330 L350 25 L370 65 L390 45 H640"
+                  fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </div>
+</div>
+
+<!-- PACKAGES -->
+<div class="section">
+    <div class="wrap">
+        <div class="section-head">
+            <div class="eyebrow">Curated for you</div>
+            <h2>Premium Health Packages</h2>
+            <p>Bundled test panels at a special combined rate — free home sample collection included.</p>
+        </div>
+        <div class="pkg-grid" id="pkgGrid"></div>
+        <div class="compare-bar" id="compareBar"><span id="compareCount">0 packages selected</span><button onclick="openCompare()">Compare Packages</button></div>
+    </div>
+</div>
+
+<!-- TEST SEARCH -->
+<div class="section" style="padding-top:0;">
+    <div class="wrap">
+        <div class="test-toolbar">
+            <div>
+                <h2 id="rateListTitle">🔬 Test &amp; Home Collection Rates</h2>
+                <p id="rateListNote" style="margin:4px 0 0;color:var(--text-soft);font-size:11px;">Search a test to view its current booking price.</p>
+            </div>
+            <div class="search-box">
+                <input type="text" id="testSearch" placeholder="Search tests (e.g. CBC)..." oninput="renderTests()">
+            </div>
+        </div>
+        <div class="test-grid" id="testGrid"></div>
+    </div>
+</div>
+
+<!-- MODALS -->
+
+<!-- 1. REPORT FINDER MODAL -->
+<div class="overlay" id="reportModal">
+    <div class="modal wide">
+        <button class="close-x" onclick="closeModal('reportModal')">✕</button>
+        <h3>📄 Find Your Reports</h3>
+        <p style="font-size:13px; color:var(--text-soft); margin-bottom:15px;">Enter your registered 10-digit mobile number.</p>
+        <div class="search-flex">
+            <input type="number" id="patientPhone" placeholder="Mobile Number (e.g. 9876543210)">
+            <button class="btn btn-primary" style="flex:0 0 auto;" onclick="findMyReports()">Search</button>
+        </div>
+        <div id="reportResults" style="margin-top: 15px;"></div>
+    </div>
+</div>
+
+<!-- 2. CART MODAL -->
+<div class="overlay" id="cartModal">
+    <div class="modal">
+        <button class="close-x" onclick="closeModal('cartModal')">✕</button>
+        <h3>🛒 Your Cart</h3>
+        <div id="cartItemsArea">
+            <div style="text-align:center; padding:20px; color:var(--text-soft);">Cart is empty</div>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-top:15px; font-weight:bold; font-size:16px;">
+            <span>Total:</span>
+            <span id="cartTotalAmt">₹0</span>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-primary" style="width:100%; background:#25D366;" onclick="checkoutWhatsApp()">📱 Book via WhatsApp</button>
+        </div>
+    </div>
+</div>
+
+<!-- 3. PACKAGE COMPARISON -->
+<div class="overlay" id="compareModal">
+    <div class="modal wide">
+        <button class="close-x" onclick="closeModal('compareModal')">✕</button>
+        <h3>🔎 Compare Health Packages</h3>
+        <p style="font-size:12px; color:var(--text-soft); margin:-5px 0 16px;">Tests marked <b>Extra here</b> are not included in the other selected packages.</p>
+        <div class="compare-grid" id="compareContent"></div>
+    </div>
+</div>
+
+<!-- 4. ADMIN LOGIN MODAL -->
+<div class="overlay" id="adminLoginOverlay">
+    <div class="modal">
+        <button class="close-x" onclick="closeModal('adminLoginOverlay')">✕</button>
+        <h3 id="portalLoginTitle">🔐 Partner Lab Login</h3>
+        <p id="portalLoginNote" style="font-size:12px;color:var(--text-soft);margin:-6px 0 12px;">Partner accounts can view their agreed test rates.</p>
+        <label>Username</label>
+        <input type="text" id="adminUser" placeholder="Partner username">
+        <label>Password</label>
+        <input type="password" id="adminPass" placeholder="Password">
+        <div class="modal-actions">
+            <button class="btn btn-primary" onclick="attemptAdminLogin()" style="width:100%;">Login</button>
+        </div>
+    </div>
+</div>
+
+<!-- 4. PKG EDIT MODAL -->
+<div class="overlay" id="pkgModalOverlay">
+    <div class="modal wide">
+        <button class="close-x" onclick="closeModal('pkgModalOverlay')">✕</button>
+        <h3 id="pkgModalTitle">Add/Edit Package</h3>
+        
+        <label>Package Title</label>
+        <input type="text" id="pkgTitle">
+        <label>Subtitle / Description</label>
+        <input type="text" id="pkgSubtitle">
+        <label>Badge (e.g. POPULAR)</label>
+        <input type="text" id="pkgBadge">
+        
+        <label>Theme Color</label>
+        <div class="theme-grid" id="themeGrid"></div>
+        
+        <label>Select Included Tests</label>
+        <div class="test-pick-list" id="testPickList"></div>
+        
+        <label>Special Final Price (₹)</label>
+        <input type="number" id="pkgSpecial">
+        
+        <div class="modal-actions">
+            <button class="btn btn-primary" onclick="savePackage()" style="width:100%;">Save Package</button>
+        </div>
+    </div>
+</div>
+
+<!-- NATIVE PRINT ENGINE TARGET AREA -->
+<div id="printableReportArea">
+    <img id="prLetterheadImg" class="letterhead-bg" style="display:none;">
+    <table style="width: 100%; border: none; border-collapse: collapse;">
+        <thead style="border: none;">
+            <tr><td id="topSpaceCell" style="border: none; padding: 0;"></td></tr>
+        </thead>
+        <tbody style="border: none;">
+            <tr>
+                <td style="border: none; padding: 0;">
+                    <div id="printContentWrapper">
+                        <div class="fallback-header" id="prTextHeader">
+                            <div><h1 id="prLabName">SL DIAGNOSTIC CENTER</h1></div>
+                        </div>
+                        <table class="rep-info-table">
+                            <tr>
+                                <td width="50%" class="box-cell">
+                                    <table class="inner-info">
+                                        <tr><td class="inner-lbl">Patient Name</td><td class="inner-colon">:</td><td><b id="prName" style="font-size: 15px;">-</b></td></tr>
+                                        <tr><td class="inner-lbl">Age / Sex</td><td class="inner-colon">:</td><td id="prAgeSex">-</td></tr>
+                                        <tr><td class="inner-lbl">Referred By</td><td class="inner-colon">:</td><td id="prDoc">-</td></tr>
+                                    </table>
+                                </td>
+                                <td width="50%" class="box-cell">
+                                    <table class="inner-info">
+                                        <tr><td class="inner-lbl" style="width: 130px;">Report Lab ID</td><td class="inner-colon">:</td><td><b id="prLabNo">-</b></td></tr>
+                                        <tr><td class="inner-lbl">Sample Date</td><td class="inner-colon">:</td><td id="prSampleDate">-</td></tr>
+                                        <tr><td class="inner-lbl">Report Date</td><td class="inner-colon">:</td><td id="prReportDate">-</td></tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                        <table class="rep-main-table">
+                            <thead><tr><th width="40%">Test Name</th><th width="20%">Result</th><th width="15%">Unit</th><th width="25%">Ref Range</th></tr></thead>
+                            <tbody id="prTestRows"></tbody>
+                        </table>
+                        <div style="text-align: center; margin-top: 50px; font-weight: bold; font-size: 12px; color: #333;">*** End of Report ***</div>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+        <tfoot style="border: none;">
+            <tr><td id="bottomSpaceCell" style="border: none; padding: 0;"></td></tr>
+        </tfoot>
+    </table>
+</div>
+
+<script>
+const dbUrl = "https://diagnostic-center-74aa4-default-rtdb.firebaseio.com/lab_data.json";
+const analyticsUrl = "https://diagnostic-center-74aa4-default-rtdb.firebaseio.com/lab_data/analytics.json";
+let fullDatabase = {};
+let isAdmin = false;
+let editingPkgId = null;
+let compareSelection = [];
+let packageObserver = null;
+let portalPartner = null;
+
+// Cart System
+let cart = [];
+
+const THEMES = {
+    amber:  { grad:'linear-gradient(135deg,#F59E0B,#EA580C)' },
+    rose:   { grad:'linear-gradient(135deg,#F43F5E,#DC2626)' },
+    green:  { grad:'linear-gradient(135deg,#10B981,#059669)' },
+    indigo: { grad:'linear-gradient(135deg,#6366F1,#4F46E5)' },
+    purple: { grad:'linear-gradient(135deg,#C026D3,#9333EA)' },
+    cyan:   { grad:'linear-gradient(135deg,#06B6D4,#2563EB)' }
+};
+
+const DEFAULT_PACKAGES = [
+    { id:'pkg1', title:'Full Body Health Gold Package', subtitle:'Comprehensive preventive health profile covering vital bodily systems.', badge:'POPULAR', theme:'amber', special_rate:1499,
+      items:['Complete Blood Count (CBC)','Liver Function Test (LFT)','Kidney Function Test (KFT)','Lipid Profile','Thyroid Profile (T3, T4, TSH)','Fasting Blood Sugar (FBS)'] },
+    { id:'pkg2', title:'Cardiac Heart Care Premium Package', subtitle:'Advanced cardiac profiling for detection of lipid imbalances and heart disease risk.', badge:'HEART HEALTH', theme:'rose', special_rate:1999,
+      items:['Lipid Profile','Serum Creatinine','Complete Blood Count (CBC)'] },
+    { id:'pkg3', title:'Diabetes & Sugar Care Plan', subtitle:'Routine screening recommended for sugar monitoring and diabetic care.', badge:'VALUE PACKAGE', theme:'green', special_rate:799,
+      items:['Fasting Blood Sugar (FBS)','HbA1c','Lipid Profile'] },
+    { id:'pkg4', title:'Senior Citizen Wellness Package', subtitle:'Metabolic health, bone density indicators and organ health screen for seniors.', badge:'ELDERS ADVANTAGE', theme:'indigo', special_rate:1299,
+      items:['Calcium','Vitamin D3','Vitamin B12','Kidney Function Test (KFT)','Complete Blood Count (CBC)'] },
+    { id:'pkg5', title:'Women Wellness Metabolic Profile', subtitle:'Focused hormonal and vitamin screening package formulated specifically for women.', badge:'SPECIAL CARE', theme:'purple', special_rate:1399,
+      items:['Thyroid Profile (T3, T4, TSH)','Vitamin B12','Vitamin D3','Complete Blood Count (CBC)'] },
+    { id:'pkg6', title:'Young India Gym & Fitness Profile', subtitle:'Perfect for health-conscious youth, gym-goers, and muscle builders.', badge:'ACTIVE LIFE', theme:'cyan', special_rate:1199,
+      items:['Complete Blood Count (CBC)','Uric Acid','Lipid Profile','Vitamin D3'] }
+];
+
+function viewerDevice(){ return window.innerWidth <= 760 ? 'Mobile' : 'Desktop'; }
+function analyticsList(data){ return Array.isArray(data) ? data : Object.values(data || {}); }
+async function trackViewer(action, details = {}){
+    try{
+        await fetch(analyticsUrl, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ id:`evt_${Date.now()}_${Math.random().toString(36).slice(2,7)}`, time:new Date().toLocaleString('en-IN'), action, device:viewerDevice(), ...details })});
+    }catch(error){ console.warn('Analytics event could not be saved.', error); }
+}
+function recordPortalVisit(){
+    if(sessionStorage.getItem('sl_portal_visit')) return;
+    sessionStorage.setItem('sl_portal_visit','1');
+    trackViewer('portal_visit');
+}
+
+async function loadData(){
+    document.getElementById('loadingBar').style.display = 'block';
+    try{
+        let res = await fetch(dbUrl, { headers: { 'Cache-Control': 'no-cache' }});
+        fullDatabase = await res.json() || {};
+        if(!fullDatabase.tests) fullDatabase.tests = [];
+        if(!fullDatabase.patients) fullDatabase.patients = [];
+        if(!fullDatabase.packages || fullDatabase.packages.length === 0) fullDatabase.packages = DEFAULT_PACKAGES;
+        if(!fullDatabase.letterheads) fullDatabase.letterheads = [];
+
+        let lab = fullDatabase.lab_name || "SL Diagnostic Center";
+        document.getElementById('navLabName').innerText = lab;
+        document.getElementById('heroLabName').innerText = lab.toUpperCase();
+        if(fullDatabase.lab_address) document.getElementById('heroAddress').innerText = fullDatabase.lab_address;
+
+        renderPackages();
+        renderTests();
+        recordPortalVisit();
+    }catch(e){ console.error(e); }
+    finally{ document.getElementById('loadingBar').style.display = 'none'; }
+}
+
+/* --- CART LOGIC --- */
+function addToCart(type, id, name, price) {
+    cart.push({ type, id, name, price: Number(price) });
+    trackViewer(type === 'pkg' ? 'package_add_to_cart' : 'test_add_to_cart', {item_id:String(id), item_name:name, price:Number(price)});
+    updateCartUI();
+}
+function removeFromCart(index) {
+    cart.splice(index, 1);
+    updateCartUI();
+}
+function updateCartUI() {
+    document.getElementById('cartCount').innerText = cart.length;
+    let area = document.getElementById('cartItemsArea');
+    area.innerHTML = '';
+    let total = 0;
+    
+    if(cart.length === 0) {
+        area.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-soft);">Cart is empty</div>';
+    } else {
+        cart.forEach((item, i) => {
+            total += item.price;
+            area.innerHTML += `
+                <div class="cart-item">
+                    <span>${item.type === 'pkg' ? '🎁' : '🧪'} ${item.name}</span>
+                    <span>₹${item.price} <button class="cart-del" onclick="removeFromCart(${i})">✕</button></span>
+                </div>
+            `;
+        });
+    }
+    document.getElementById('cartTotalAmt').innerText = '₹' + total;
+}
+function checkoutWhatsApp() {
+    if(cart.length === 0) return alert("Cart is empty!");
+    let total = 0;
+    let msg = `Hi SL Diagnostic, I want to book:\n\n`;
+    
+    let pkgs = cart.filter(c => c.type === 'pkg');
+    if(pkgs.length > 0) {
+        msg += `*Packages:*\n`;
+        pkgs.forEach(p => { msg += `- ${p.name} (₹${p.price})\n`; total += p.price; });
+    }
+    
+    let tests = cart.filter(c => c.type === 'test');
+    if(tests.length > 0) {
+        msg += `\n*Tests:*\n`;
+        tests.forEach(t => { msg += `- ${t.name} (₹${t.price})\n`; total += t.price; });
+    }
+    
+    msg += `\n*Total Estimate: ₹${total}*\n\nPlease confirm my booking and arrange home sample collection.`;
+    
+    let phone = (fullDatabase.lab_phones || "91").split(',')[0].replace(/[^0-9]/g,'');
+    if(phone.length === 10) phone = "91" + phone;
+    
+    trackViewer('whatsapp_booking', {items:cart.map(item => ({type:item.type, id:String(item.id), name:item.name, price:item.price})), total});
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`);
+}
+
+/* --- PATIENT REPORT FINDER --- */
+function safeKey(key) { return key ? String(key).replace(/[.#$\[\]\/]/g, '_') : "unknown"; }
+
+function findMyReports() {
+    let phone = document.getElementById('patientPhone').value.trim();
+    let resArea = document.getElementById('reportResults');
+    resArea.innerHTML = '';
+    
+    if(!phone || phone.length < 10) { resArea.innerHTML = '<div style="color:red;">Please enter valid 10-digit number.</div>'; return; }
+
+    let matches = [];
+    fullDatabase.patients.forEach((p, idx) => {
+        if(p && p.phone === phone && p.test_results && Object.keys(p.test_results).length > 0) {
+            matches.push({ patient: p, index: idx });
+        }
+    });
+
+    if(matches.length === 0) { resArea.innerHTML = '<div style="color:red;">No completed reports found for this number.</div>'; return; }
+
+    matches.reverse().forEach(m => {
+        let p = m.patient;
+        resArea.innerHTML += `
+            <div class="report-item">
+                <div class="report-info">
+                    <strong>👤 ${p.name.toUpperCase()}</strong>
+                    <div>📅 ${p.date} | 🆔 Lab No: ${p.lab_no || 'N/A'}</div>
+                </div>
+                <div class="btn-dl-group">
+                    <button class="btn-download" onclick="generatePatientPDF(${m.index})">📥 PDF</button>
+                    <button class="btn-print" onclick="printPatientReport(${m.index})">🖨️ Print</button>
+                </div>
+            </div>
+        `;
+    });
+}
+
+// 🔥 UNIFIED PORTAL REPORT ENGINE (Handles # Highlights, * Exclusive Pages & End of Report)
+function setupPortalPrintView(ptIndex) {
+    let p = fullDatabase.patients[ptIndex];
+    let lhImgSrc = fullDatabase.letterhead_image || (fullDatabase.letterheads && fullDatabase.letterheads.length > 0 ? fullDatabase.letterheads[0].img : null);
+    let tMargin = 45; let bMargin = 30; 
+    if(fullDatabase.letterheads && fullDatabase.letterheads.length > 0) { 
+        tMargin = fullDatabase.letterheads[0].top || 45; 
+        bMargin = fullDatabase.letterheads[0].bot || 30; 
+    }
+
+    let resultHtml = `
+        <div style="padding-left: 38px; padding-right: 38px; padding-top: ${tMargin}mm; padding-bottom: ${bMargin}mm;">
+            ${lhImgSrc ? '' : `
+            <div style="display: flex; align-items: center; border-bottom: 3px solid #F57C00; padding-bottom: 8px; margin-bottom: 10px;">
+                <h1 style="margin: 0; color: #000080; font-size: 20px;">${(fullDatabase.lab_name || "SL DIAGNOSTIC CENTER").toUpperCase()}</h1>
+            </div>`}
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; border: 2px solid #000;">
+                <tr>
+                    <td style="width: 50%; padding: 12px 15px; vertical-align: top; border: 1px solid #000;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.6;">
+                            <tr><td style="width: 110px; font-weight: bold; border:none;">Patient Name</td><td style="width: 15px; font-weight: bold; border:none;">:</td><td style="border:none;"><b style="font-size: 15px;">${p.name ? p.name.toUpperCase() : "-"}</b></td></tr>
+                            <tr><td style="font-weight: bold; border:none;">Age / Sex</td><td style="font-weight: bold; border:none;">:</td><td style="border:none;">${p.age} Y / ${p.gender}</td></tr>
+                            <tr><td style="font-weight: bold; border:none;">Referred By</td><td style="font-weight: bold; border:none;">:</td><td style="border:none;">${p.doctor || "Self"}</td></tr>
+                        </table>
+                    </td>
+                    <td style="width: 50%; padding: 12px 15px; vertical-align: top; border: 1px solid #000;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.6;">
+                            <tr><td style="width: 130px; font-weight: bold; border:none;">Report Lab ID</td><td style="width: 15px; font-weight: bold; border:none;">:</td><td style="border:none;"><b>${p.lab_no || "-"}</b></td></tr>
+                            <tr><td style="font-weight: bold; border:none;">Sample Date</td><td style="font-weight: bold; border:none;">:</td><td style="border:none;">${p.date || "-"}</td></tr>
+                            <tr><td style="font-weight: bold; border:none;">Report Date</td><td style="font-weight: bold; border:none;">:</td><td style="border:none;">${p.date || "-"}</td></tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+    `;
+
+    if(p.selected_tests) {
+        let totalTests = p.selected_tests.length;
+        
+        p.selected_tests.forEach((tName, index) => {
+            let cleanTName = tName.replace(/\*/g, '').trim();
+            let dbTest = fullDatabase.tests.find(t => t.name.replace(/\*/g, '').trim().toUpperCase() === cleanTName.toUpperCase());
+            let params = dbTest && dbTest.parameters ? dbTest.parameters : [{name: cleanTName, unit: "-", range: "-"}];
+            
+            let isExclusive = tName.includes('*') || (dbTest && dbTest.name.includes('*'));
+            let tableStyle = 'width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; page-break-inside: avoid;';
+            
+            if (isExclusive) {
+                if (index !== 0) tableStyle += ' page-break-before: always; break-before: page;';
+                tableStyle += ' page-break-after: always; break-after: page;';
+            }
+
+            resultHtml += `<table style="${tableStyle}">`;
+            resultHtml += `<thead><tr><th width="40%" style="border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 6px 8px; text-align: left; background-color: #f9f9f9 !important; font-size: 13px;">Test Name</th><th width="20%" style="border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 6px 8px; text-align: left; background-color: #f9f9f9 !important; font-size: 13px;">Result</th><th width="15%" style="border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 6px 8px; text-align: left; background-color: #f9f9f9 !important; font-size: 13px;">Unit</th><th width="25%" style="border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 6px 8px; text-align: left; background-color: #f9f9f9 !important; font-size: 13px;">Ref Range</th></tr></thead><tbody>`;
+            
+            if (cleanTName.toUpperCase().includes('WIDAL')) {
+                resultHtml += `<tr><td colspan="4" class="test-category-title">${cleanTName.toUpperCase()}</td></tr>`;
+                
+                let wHtml = `<table style="width:100%; border-collapse: collapse; margin:10px 0 15px 0; text-align:center; font-size:12px; border: 1.5px solid #000;"><tr style="background:#f9f9f9; font-weight:bold; border-bottom: 1.5px solid #000;"><td style="padding:6px; text-align:left; border-right: 1.5px solid #000; width:30%;">Antigen</td><td style="border-right: 1px solid #000;">1:20</td><td style="border-right: 1px solid #000;">1:40</td><td style="border-right: 1px solid #000;">1:80</td><td style="border-right: 1px solid #000;">1:160</td><td>1:320</td></tr>`;
+                let impressionText = "";
+                
+                params.forEach(param => {
+                    let sTName = safeKey(cleanTName); let sPName = safeKey(param.name);
+                    let existing = (p.test_results && p.test_results[sTName]) ? p.test_results[sTName][sPName] : undefined;
+                    if (existing === undefined) { existing = (p.test_results && p.test_results[safeKey(tName)]) ? p.test_results[safeKey(tName)][sPName] : undefined; }
+                    let val = (existing && typeof existing === 'object') ? existing.v : (existing || '');
+                    
+                    if (param.name.toUpperCase().includes('IMPRESSION') || param.name.toUpperCase().includes('REMARK')) { impressionText = val; } 
+                    else {
+                        let v = String(val).toLowerCase(); let m = ['-','-','-','-','-'];
+                        if(v.includes('320')) m = ['+','+','+','+','+']; else if(v.includes('160')) m = ['+','+','+','+','-']; else if(v.includes('80'))  m = ['+','+','+','-','-']; else if(v.includes('40'))  m = ['+','+','-','-','-']; else if(v.includes('20'))  m = ['+','-','-','-','-']; else if(v.includes('pos')) m = ['+','+','+','-','-']; 
+                        wHtml += `<tr style="border-bottom: 1px solid #000;"><td style="padding:5px; text-align:left; font-weight:600; border-right: 1.5px solid #000;">${param.name}</td><td style="border-right: 1px solid #000;">${m[0]}</td><td style="border-right: 1px solid #000;">${m[1]}</td><td style="border-right: 1px solid #000;">${m[2]}</td><td style="border-right: 1px solid #000;">${m[3]}</td><td>${m[4]}</td></tr>`;
+                    }
+                });
+                wHtml += `</table>`;
+                if (impressionText) wHtml += `<div style="margin-bottom:15px; font-size:13px; font-weight:bold;">WIDAL IMPRESSION: &nbsp;&nbsp;&nbsp; ${impressionText}</div>`;
+                resultHtml += `<tr><td colspan="4" style="padding:0;">${wHtml}</td></tr>`;
+            } else {
+                let categoryHeaderAdded = false;
+                params.forEach(param => {
+                    if (param.name.trim().startsWith('#')) {
+                        let hText = param.name.replace('#', '').trim();
+                        resultHtml += `<tr><td colspan="4" style="background-color: #E0F2FE !important; color: #1E3A8A !important; font-weight: bold; padding: 6px 8px; border-top: 1px solid #CBD5E1; border-bottom: 1px solid #CBD5E1; font-size: 13px; text-transform: uppercase; -webkit-print-color-adjust: exact; print-color-adjust: exact;">${hText}</td></tr>`;
+                        return;
+                    }
+
+                    let sTName = safeKey(cleanTName); let sPName = safeKey(param.name);
+                    let existing = (p.test_results && p.test_results[sTName]) ? p.test_results[sTName][sPName] : undefined;
+                    if (existing === undefined) { existing = (p.test_results && p.test_results[safeKey(tName)]) ? p.test_results[safeKey(tName)][sPName] : undefined; }
+                    let val = '', unit = param.unit || '', range = param.range || '', isAb = false, isPrint = true;
+                    
+                    if (existing !== undefined && existing !== null) {
+                        if (typeof existing === 'object') { val = existing.v !== undefined ? existing.v : ''; unit = existing.u !== undefined ? existing.u : unit; range = existing.r !== undefined ? existing.r : range; isAb = existing.a || false; isPrint = existing.p !== undefined ? existing.p : true;
+                        } else { val = String(existing); }
+                    }
+                    if (!isPrint) return;
+                    if (!categoryHeaderAdded) { resultHtml += `<tr><td colspan="4" class="test-category-title">${cleanTName.toUpperCase()}</td></tr>`; categoryHeaderAdded = true; }
+                    let displayRes = val ? (isAb ? `<span style="color:#DC2626; font-weight:900;">${val}</span>` : `<b>${val}</b>`) : '-';
+                    resultHtml += `<tr><td style="padding: 5px 8px; line-height: 1.4; font-weight:500;">${param.name}</td><td style="padding: 5px 8px; line-height: 1.4;">${displayRes}</td><td style="padding: 5px 8px; line-height: 1.4;">${unit}</td><td style="padding: 5px 8px; line-height: 1.4;">${range}</td></tr>`;
+                });
+            }
+            
+            // 🔥 आखिरी टेबल में End of Report फिक्स
+            if (index === totalTests - 1) {
+                resultHtml += `<tr><td colspan="4" style="text-align: center; padding-top: 30px; padding-bottom: 10px; font-weight: bold; font-size: 12px; color: #333; border: none;">*** End of Report ***</td></tr>`;
+            }
+            resultHtml += `</tbody></table>`;
+        });
+    }
+
+    resultHtml += `</div>`;
+    return { html: resultHtml, lhImgSrc: lhImgSrc, pName: (p.name ? p.name.toUpperCase() : "Report"), pObj: p };
+}
+
+// 📥 PERFECT PDF ENGINE (Mobile Optimized)
+function generatePatientPDF(ptIndex) {
+    if(typeof html2pdf === 'undefined') { alert("PDF Engine loading. Please wait..."); return; }
+    
+    let reportData = setupPortalPrintView(ptIndex);
+    if(typeof trackViewer === 'function') trackViewer('report_download', {patient_name:reportData.pObj.name||'', phone:reportData.pObj.phone||'', lab_no:reportData.pObj.lab_no||''});
+
+    let overlay = document.createElement('div');
+    overlay.style.position = 'absolute'; overlay.style.top = '0'; overlay.style.left = '0';
+    overlay.style.width = '100%'; overlay.style.minHeight = '100vh';
+    overlay.style.backgroundColor = '#ffffff'; overlay.style.zIndex = '999999';
+    overlay.innerHTML = '<div style="text-align:center; padding:20px; font-weight:bold; color:#3B82F6;">⏳ Generating PDF... Please wait 2 seconds.</div>';
+    
+    let pdfWrapper = document.createElement('div');
+    pdfWrapper.style.width = '794px'; pdfWrapper.style.minHeight = '1123px';
+    pdfWrapper.style.margin = '0 auto'; pdfWrapper.style.backgroundColor = '#ffffff'; pdfWrapper.style.color = '#000000';
+    
+    if (reportData.lhImgSrc) {
+        pdfWrapper.style.backgroundImage = `url(${reportData.lhImgSrc})`;
+        pdfWrapper.style.backgroundSize = '794px 1123px';
+        pdfWrapper.style.backgroundRepeat = 'repeat-y';
+        pdfWrapper.style.backgroundPosition = 'top left';
+    }
+
+    pdfWrapper.innerHTML = reportData.html;
+    overlay.appendChild(pdfWrapper);
+    document.body.appendChild(overlay);
+    window.scrollTo(0, 0);
+    
+    document.getElementById('loadingBar').style.display = 'block';
+
+    let opt = {
+        margin:       0,
+        filename:     reportData.pName + '_Lab_Report.pdf',
+        image:        { type: 'jpeg', quality: 1 },
+        html2canvas:  { scale: 2, useCORS: true, scrollY: 0, windowWidth: 794 },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    setTimeout(() => {
+        html2pdf().set(opt).from(pdfWrapper).save().then(() => {
+            document.body.removeChild(overlay); 
+            document.getElementById('loadingBar').style.display = 'none';
+        }).catch(err => {
+            console.error(err);
+            document.body.removeChild(overlay);
+            document.getElementById('loadingBar').style.display = 'none';
+            alert("Error generating PDF.");
+        });
+    }, 1500); 
+}
+
+// 🖨️ NATIVE PRINT (Fixes Mobile Letterhead Shifting)
+function printPatientReport(ptIndex) {
+    let reportData = setupPortalPrintView(ptIndex);
+    if(typeof trackViewer === 'function') trackViewer('report_print', {patient_name:reportData.pObj.name||'', phone:reportData.pObj.phone||'', lab_no:reportData.pObj.lab_no||''});
+    
+    let printArea = document.getElementById('printableReportArea');
+    printArea.innerHTML = reportData.html;
+
+    if (reportData.lhImgSrc) {
+        printArea.style.backgroundImage = `url(${reportData.lhImgSrc})`;
+        printArea.style.backgroundSize = '210mm 297mm'; 
+        printArea.style.backgroundRepeat = 'repeat-y'; 
+        printArea.style.backgroundPosition = 'top center';
+    } else {
+        printArea.style.backgroundImage = 'none';
+    }
+
+    document.body.classList.add('is-pdf-mode');
+    setTimeout(() => { 
+        window.print(); 
+        document.body.classList.remove('is-pdf-mode');
+    }, 500);
+}
+
+function printPatientReport(ptIndex) {
+    let p = fullDatabase.patients[ptIndex];
+    let lhImgSrc = fullDatabase.letterhead_image || (fullDatabase.letterheads && fullDatabase.letterheads.length > 0 ? fullDatabase.letterheads[0].img : null);
+    let tMargin = 45; let bMargin = 30; 
+    if(fullDatabase.letterheads && fullDatabase.letterheads.length > 0) { tMargin = fullDatabase.letterheads[0].top || 45; bMargin = fullDatabase.letterheads[0].bot || 30; }
+
+    document.getElementById('topSpaceCell').style.height = tMargin + "mm";
+    document.getElementById('bottomSpaceCell').style.height = bMargin + "mm";
+
+    document.getElementById('prName').innerText = p.name ? p.name.toUpperCase() : "-";
+    document.getElementById('prAgeSex').innerText = `${p.age} Y / ${p.gender}`;
+    document.getElementById('prDoc').innerText = p.doctor || "Self";
+    document.getElementById('prLabNo').innerText = p.lab_no || "N/A";
+    document.getElementById('prSampleDate').innerText = p.date || ""; 
+    document.getElementById('prReportDate').innerText = p.date || ""; 
+
+    let printTable = document.getElementById('prTestRows'); 
+    printTable.innerHTML = '';
+    
+    if(p.selected_tests) {
+        p.selected_tests.forEach(tName => {
+            let dbTest = fullDatabase.tests.find(t => t.name === tName);
+            let params = dbTest && dbTest.parameters ? dbTest.parameters : [{name: tName, unit: "-", range: "-"}];
+            
+            if (tName.toUpperCase().includes('WIDAL')) {
+                printTable.innerHTML += `<tr><td colspan="4" class="test-category-title">${tName.toUpperCase()}</td></tr>`;
+                let wHtml = `<table style="width:100%; border-collapse: collapse; margin:10px 0 15px 0; text-align:center; font-size:12px; border: 1.5px solid #000;">
+                    <tr style="background:#f9f9f9; font-weight:bold; border-bottom: 1.5px solid #000;">
+                        <td style="padding:6px; text-align:left; border-right: 1.5px solid #000; width:30%;">Antigen</td>
+                        <td style="border-right: 1px solid #000;">1:20</td><td style="border-right: 1px solid #000;">1:40</td>
+                        <td style="border-right: 1px solid #000;">1:80</td><td style="border-right: 1px solid #000;">1:160</td><td>1:320</td>
+                    </tr>`;
+                let impressionText = "";
+                params.forEach(param => {
+                    let sTName = safeKey(tName); let sPName = safeKey(param.name);
+                    let existing = (p.test_results && p.test_results[sTName]) ? p.test_results[sTName][sPName] : undefined;
+                    let val = (existing && typeof existing === 'object') ? existing.v : (existing || '');
+                    if (param.name.toUpperCase().includes('IMPRESSION')) { impressionText = val; } 
+                    else {
+                        let v = String(val).toLowerCase(); let m = ['-','-','-','-','-'];
+                        if(v.includes('320')) m = ['+','+','+','+','+']; else if(v.includes('160')) m = ['+','+','+','+','-']; else if(v.includes('80')) m = ['+','+','+','-','-']; else if(v.includes('40')) m = ['+','+','-','-','-']; else if(v.includes('20')) m = ['+','-','-','-','-']; else if(v.includes('pos')) m = ['+','+','+','-','-']; 
+                        wHtml += `<tr style="border-bottom: 1px solid #000;"><td style="padding:5px; text-align:left; font-weight:600; border-right: 1.5px solid #000;">${param.name}</td><td style="border-right: 1px solid #000;">${m[0]}</td><td style="border-right: 1px solid #000;">${m[1]}</td><td style="border-right: 1px solid #000;">${m[2]}</td><td style="border-right: 1px solid #000;">${m[3]}</td><td>${m[4]}</td></tr>`;
+                    }
+                });
+                wHtml += `</table>`;
+                if (impressionText) wHtml += `<div style="margin-bottom:15px; font-size:13px; font-weight:bold;">WIDAL IMPRESSION: &nbsp;&nbsp;&nbsp; ${impressionText}</div>`;
+                printTable.innerHTML += `<tr><td colspan="4" style="padding:0;">${wHtml}</td></tr>`;
+                return; 
+            }
+
+            let categoryHeaderAdded = false;
+            params.forEach(param => {
+                let sTName = safeKey(tName); let sPName = safeKey(param.name);
+                let existing = (p.test_results && p.test_results[sTName]) ? p.test_results[sTName][sPName] : undefined;
+                let val = '', unit = param.unit || '', range = param.range || '', isAb = false, isPrint = true;
+                if (existing !== undefined && existing !== null) {
+                    if (typeof existing === 'object') { val = existing.v !== undefined ? existing.v : ''; unit = existing.u !== undefined ? existing.u : unit; range = existing.r !== undefined ? existing.r : range; isAb = existing.a || false; isPrint = existing.p !== undefined ? existing.p : true; } 
+                    else { val = String(existing); }
+                }
+                if (!isPrint) return;
+                if (!categoryHeaderAdded) { printTable.innerHTML += `<tr><td colspan="4" style="padding: 8px 6px 4px 6px; font-weight: bold; color: #000080; text-decoration: underline; font-size: 13px;">${tName.toUpperCase()}</td></tr>`; categoryHeaderAdded = true; }
+                let displayRes = val ? (isAb ? `<span class="abnormal-print">${val}</span>` : `<b>${val}</b>`) : '-';
+                printTable.innerHTML += `<tr><td style="font-weight:500;">${param.name}</td><td>${displayRes}</td><td>${unit}</td><td>${range}</td></tr>`;
+            });
+        });
+    }
+
+    let lhImg = document.getElementById('prLetterheadImg');
+    let textHeader = document.getElementById('prTextHeader');
+
+    if (lhImgSrc) {
+        lhImg.src = lhImgSrc;
+        lhImg.style.display = 'block';
+        textHeader.style.display = 'none';
+    } else {
+        lhImg.style.display = 'none';
+        textHeader.style.display = 'flex';
+    }
+
+    setTimeout(() => { window.print(); }, 300);
+}
+
+
+/* --- ADMIN & EDIT LOGIC --- */
+function toggleTheme(){ let h=document.documentElement; h.setAttribute('data-theme', h.getAttribute('data-theme')==='dark'?'light':'dark'); }
+async function persist(){ await fetch(dbUrl, { method:'PUT', body: JSON.stringify(fullDatabase) }); }
+
+function getTestRate(tName) {
+    let t = fullDatabase.tests.find(x => x.name === tName);
+    return t ? (parseFloat(t.patient_rate) || 0) : 0;
+}
+function hasPartnerAccess(){ return !!(portalPartner && portalPartner.role === 'Partner Lab'); }
+function getPortalTestRate(test){ return Number(hasPartnerAccess() ? (test.partner_lab_rate ?? test.patient_rate) : test.patient_rate) || 0; }
+function updateRateListMode(){
+    const title = document.getElementById('rateListTitle'), note = document.getElementById('rateListNote'), button = document.getElementById('staffLoginBtn');
+    if(hasPartnerAccess()){
+        title.textContent = '🤝 Partner Lab Rate List';
+        note.textContent = `Logged in as ${portalPartner.name || portalPartner.username}. Your agreed partner rates are visible.`;
+        button.textContent = '↪ Partner Logout';
+    } else if(isAdmin){
+        title.textContent = '⚙️ Admin Rate List';
+        note.textContent = 'Logged in as Super Admin. You can edit rates here.';
+        button.textContent = '↪ Admin Logout';
+    } else {
+        title.textContent = '🔬 Test & Home Collection Rates';
+        note.textContent = 'Search a test to view its current booking price.';
+        button.textContent = 'Partner / Admin Login';
+    }
+}
+
+function toggleCompare(id){
+    const packageId = String(id);
+    if(compareSelection.includes(packageId)){
+        compareSelection = compareSelection.filter(selected => selected !== packageId);
+    }else{
+        if(compareSelection.length >= 3) return alert('आप एक साथ केवल 3 पैकेज ही Compare कर सकते हैं।');
+        compareSelection.push(packageId);
+        
+        // नया अलर्ट: ताकि पेशेंट को पता चले कि Compare के लिए 2 पैकेज चाहिए
+        if(compareSelection.length === 1) {
+            alert('✅ 1 पैकेज सेलेक्ट हो गया! Compare करने के लिए कृपया एक और पैकेज सेलेक्ट करें।');
+        }
+    }
+    renderPackages();
+}
+
+function updateCompareBar(){
+    const bar = document.getElementById('compareBar');
+    const count = compareSelection.length;
+    bar.style.display = count > 0 ? 'flex' : 'none';
+    document.getElementById('compareCount').textContent = `${count} package${count === 1 ? '' : 's'} selected`;
+}
+
+function openCompare(){
+    if(compareSelection.length < 2) {
+        alert('⚠️ कृपया Compare करने के लिए कम से कम 2 पैकेज सेलेक्ट करें।');
+        return;
+    }
+    const packages = fullDatabase.packages.filter(pkg => compareSelection.includes(String(pkg.id)));
+    const content = document.getElementById('compareContent');
+    content.innerHTML = packages.map(pkg => {
+        const otherTests = new Set(packages.filter(other => other.id !== pkg.id).flatMap(other => other.items || []));
+        const price = Number(pkg.special_rate) || 0;
+        return `<article class="compare-card"><h4>${pkg.title}</h4><div style="font-size:10px; color:var(--text-soft);">${(pkg.items || []).length} tests included</div><div class="compare-price">₹${price}</div><ul>${(pkg.items || []).map(test => `<li>✓ ${test}${!otherTests.has(test) ? '<span class="compare-extra">Extra here</span>' : ''}</li>`).join('') || '<li>No tests selected</li>'}</ul></article>`;
+    }).join('');
+    trackViewer('package_compare', {package_ids:packages.map(pkg => String(pkg.id)), package_names:packages.map(pkg => pkg.title)});
+    openModal('compareModal');
+}
+
+function observePackageViews(){
+    if(packageObserver) packageObserver.disconnect();
+    const seen = new Set(JSON.parse(sessionStorage.getItem('sl_seen_packages') || '[]'));
+    packageObserver = new IntersectionObserver(entries => entries.forEach(entry => {
+        if(!entry.isIntersecting) return;
+        const card = entry.target;
+        const id = card.dataset.packageId;
+        if(id && !seen.has(id)){
+            seen.add(id);
+            sessionStorage.setItem('sl_seen_packages', JSON.stringify([...seen]));
+            trackViewer('package_view', {package_id:id, package_name:card.dataset.packageName || '', category:card.dataset.packageCategory || ''});
+        }
+        packageObserver.unobserve(card);
+    }), {threshold:.55});
+    document.querySelectorAll('[data-package-id]').forEach(card => packageObserver.observe(card));
+}
+
+function renderPackages(){
+    let grid = document.getElementById('pkgGrid'); grid.innerHTML = '';
+    let visiblePackages = fullDatabase.packages.filter(pkg => pkg.active !== false || isAdmin);
+    visiblePackages.forEach(pkg=>{
+        let theme = THEMES[pkg.theme] || THEMES.amber;
+        
+        let gross = 0;
+        let packageItems = pkg.items || [];
+        let itemsHtml = packageItems.slice(0, 4).map(tName => {
+            let tr = getTestRate(tName);
+            gross += tr;
+            return `<li><span style="color:#10B981; margin-right:5px;">✔</span><span>${tName}</span></li>`;
+        }).join('');
+        packageItems.slice(4).forEach(tName => { gross += getTestRate(tName); });
+        let originalPrice = Number(pkg.original_price) || gross;
+        let specialPrice = Number(pkg.special_rate) || 0;
+        let discount = originalPrice > specialPrice && specialPrice ? Math.round(((originalPrice - specialPrice) / originalPrice) * 100) : 0;
+        let moreTests = packageItems.length > 4 ? `<details class="pkg-more"><summary>View all ${packageItems.length} included tests</summary><ul class="pkg-list" style="margin-top:10px;">${packageItems.slice(4).map(t=>`<li><span style="color:#10B981; margin-right:5px;">✔</span><span>${t}</span></li>`).join('')}</ul></details>` : '';
+        let photo = pkg.image ? `<img src="${pkg.image}" alt="${pkg.title}">` : '🩺';
+
+        const selected = compareSelection.includes(String(pkg.id));
+        grid.innerHTML += `<div class="pkg-card" data-package-id="${pkg.id}" data-package-name="${pkg.title}" data-package-category="${pkg.category || 'Health Package'}">
+            ${isAdmin ? `<button class="pkg-admin-del" onclick="deletePackage('${pkg.id}')">✕</button>
+                         <button class="pkg-admin-edit" onclick="editPackage('${pkg.id}')">✏️</button>` : ''}
+            <div class="pkg-photo">${photo}</div>
+            <div class="pkg-head" style="background:${theme.grad}">
+                <div class="pkg-badge">${pkg.badge || ''}</div>
+                <div class="pkg-category">${pkg.category || 'Health Package'} ${discount ? `• SAVE ${discount}%` : ''}</div>
+                <h3>${pkg.title}</h3>
+                <p>${pkg.subtitle || ''}</p>
+            </div>
+            <div class="pkg-body">
+                <div class="pkg-count">${packageItems.length} Tests Included</div>
+                ${pkg.offer ? `<p class="pkg-offer">${pkg.offer}</p>` : ''}
+                <ul class="pkg-list">${itemsHtml}</ul>
+                ${moreTests}
+                <div class="pkg-price-row">
+                    <div><div class="pkg-mrp">Regular ₹${originalPrice}</div>
+                    <div class="pkg-special">₹${specialPrice}</div></div>
+                </div>
+                <button class="pkg-book" onclick="addToCart('pkg', '${pkg.id}', '${pkg.title}', ${specialPrice})">➕ Add to Cart</button>
+                <button class="pkg-compare ${selected ? 'selected' : ''}" onclick="toggleCompare('${pkg.id}')">${selected ? '✓ Selected for comparison' : '⇄ Compare package'}</button>
+            </div>
+        </div>`;
+    });
+
+    if (!visiblePackages.length) grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:30px; color:var(--text-soft);">No active health packages are available right now.</div>';
+    if(isAdmin) grid.innerHTML += `<div class="add-pkg-card" onclick="openPkgModal()">+ Add New Package</div>`;
+    document.body.classList.toggle('admin-on', isAdmin);
+    updateCompareBar();
+    observePackageViews();
+}
+
+async function deletePackage(id){ if(confirm("Delete Package?")){ fullDatabase.packages = fullDatabase.packages.filter(p=>p.id!==id); await persist(); renderPackages(); } }
+
+// 🔥 FAST LOAD FIX: बिना सर्च किए कोई टेस्ट लोड नहीं होगा
+function renderTests(){
+    let q = (document.getElementById('testSearch').value || '').trim().toUpperCase();
+    let grid = document.getElementById('testGrid'); 
+    grid.innerHTML = '';
+    
+    // अगर सर्च खाली है, तो पेज हैंग नहीं होगा
+    if(q.length === 0) {
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-soft);border:1px dashed var(--border);border-radius:14px;">🔍 Search a test by name to view rates and book.</div>';
+        return;
+    }
+
+    let allTests = Array.isArray(fullDatabase.tests) ? fullDatabase.tests : Object.values(fullDatabase.tests || {});
+    let list = allTests.filter(t=> t && t.name && t.name.toUpperCase().includes(q));
+    
+    let htmlStr = '';
+    list.slice(0, 50).forEach(t=>{ // केवल 50 टेस्ट एक बार में लोड होंगे
+        let rate = String(getPortalTestRate(t));
+        let realIdx = allTests.indexOf(t);
+        htmlStr += `<div class="test-card">
+            <div><div class="test-name">${t.name}</div>
+            <div class="test-rate">₹${rate}</div></div>
+            <button class="test-book" onclick="addToCart('test', '${realIdx}', '${t.name}', ${rate})">➕ Add</button>
+        </div>`;
+    });
+    
+    if(!list.length) htmlStr = '<div style="grid-column:1/-1;text-align:center;padding:22px;color:var(--text-soft);">No tests match your search.</div>';
+    
+    grid.innerHTML = htmlStr;
+}
+
+function openPortalLogin(){
+    // 🔴 CHANGED: Handles both Partner and Admin logout properly
+    if(hasPartnerAccess() || isAdmin){
+        localStorage.removeItem('sl_partner_portal_user');
+        const signedInUser = JSON.parse(localStorage.getItem('sl_active_user') || '{}');
+        if(signedInUser.role === 'Partner Lab' || signedInUser.role === 'Super Admin') {
+            localStorage.removeItem('sl_active_user');
+        }
+        portalPartner = null; 
+        isAdmin = false;
+        document.body.classList.remove('admin-on');
+        renderPackages(); 
+        renderTests(); 
+        return;
+    }
+    document.getElementById('adminLoginOverlay').style.display='flex';
+}
+
+function attemptAdminLogin(){
+    let u = document.getElementById('adminUser').value; let p = document.getElementById('adminPass').value;
+    let account = fullDatabase.users && fullDatabase.users[u];
+    
+    // Check if it's super admin
+    if((u === 'admin' && p === 'admin') || (account && account.password === p && account.role === 'Super Admin' && account.active !== false)){ 
+        isAdmin = true; 
+        closeModal('adminLoginOverlay'); 
+        renderPackages(); 
+        renderTests(); 
+        return;
+    }
+    
+    // Check if it's partner lab
+    if(account && account.password === p && account.role === 'Partner Lab' && account.active !== false){
+        portalPartner = {username:u,name:account.name || u,role:'Partner Lab',active:true};
+        localStorage.setItem('sl_partner_portal_user', JSON.stringify(portalPartner));
+        closeModal('adminLoginOverlay'); 
+        renderTests();
+        trackViewer('partner_rate_login', {partner_name:portalPartner.name, username:u});
+        return;
+    }
+    
+    alert("Invalid username or password.");
+}
+
+function openModal(id){ document.getElementById(id).style.display='flex'; }
+function closeModal(id){ document.getElementById(id).style.display='none'; }
+
+function openPkgModal(){
+    editingPkgId = null;
+    document.getElementById('pkgModalTitle').innerText = "Add New Package";
+    document.getElementById('pkgTitle').value = ''; 
+    document.getElementById('pkgSubtitle').value = ''; 
+    document.getElementById('pkgBadge').value = ''; 
+    document.getElementById('pkgSpecial').value = '';
+    
+    let themeGrid = document.getElementById('themeGrid'); themeGrid.innerHTML = '';
+    Object.keys(THEMES).forEach((k,i)=> themeGrid.innerHTML += `<div class="theme-swatch ${i===0?'active':''}" data-theme="${k}" style="background:${THEMES[k].grad}" onclick="document.querySelectorAll('.theme-swatch').forEach(s=>s.classList.remove('active')); this.classList.add('active');"></div>`);
+    
+    let list = document.getElementById('testPickList'); list.innerHTML = '';
+    fullDatabase.tests.forEach(t=> list.innerHTML += `<div class="test-pick-row"><input type="checkbox" class="pick-cb" value="${t.name}"> <span>${t.name}</span></div>`);
+    openModal('pkgModalOverlay');
+}
+
+function editPackage(id) {
+    editingPkgId = id;
+    let pkg = fullDatabase.packages.find(p => p.id === id);
+    document.getElementById('pkgModalTitle').innerText = "Edit Package";
+    document.getElementById('pkgTitle').value = pkg.title; 
+    document.getElementById('pkgSubtitle').value = pkg.subtitle || ''; 
+    document.getElementById('pkgBadge').value = pkg.badge || ''; 
+    document.getElementById('pkgSpecial').value = pkg.special_rate;
+    
+    let themeGrid = document.getElementById('themeGrid'); themeGrid.innerHTML = '';
+    Object.keys(THEMES).forEach(k => themeGrid.innerHTML += `<div class="theme-swatch ${k===pkg.theme?'active':''}" data-theme="${k}" style="background:${THEMES[k].grad}" onclick="document.querySelectorAll('.theme-swatch').forEach(s=>s.classList.remove('active')); this.classList.add('active');"></div>`);
+    
+    let list = document.getElementById('testPickList'); list.innerHTML = '';
+    fullDatabase.tests.forEach(t=> {
+        let isChecked = pkg.items.includes(t.name) ? 'checked' : '';
+        list.innerHTML += `<div class="test-pick-row"><input type="checkbox" class="pick-cb" value="${t.name}" ${isChecked}> <span>${t.name}</span></div>`;
+    });
+    openModal('pkgModalOverlay');
+}
+
+async function savePackage(){
+    let title = document.getElementById('pkgTitle').value; 
+    let sub = document.getElementById('pkgSubtitle').value; 
+    let badge = document.getElementById('pkgBadge').value; 
+    let sp = document.getElementById('pkgSpecial').value;
+    let items = Array.from(document.querySelectorAll('.pick-cb:checked')).map(cb=>cb.value);
+    
+    if(!title || items.length===0) return alert("Title and at least 1 Test required");
+    let theme = document.querySelector('.theme-swatch.active').getAttribute('data-theme');
+    
+    if (editingPkgId) {
+        let idx = fullDatabase.packages.findIndex(p => p.id === editingPkgId);
+        fullDatabase.packages[idx] = { id: editingPkgId, title, subtitle: sub, badge, theme, items, special_rate: Number(sp) };
+    } else {
+        fullDatabase.packages.push({ id:'pkg_'+Date.now(), title, subtitle: sub, badge, theme, items, special_rate: Number(sp) });
+    }
+    
+    await persist(); closeModal('pkgModalOverlay'); renderPackages();
+}
+
+window.onload = async ()=>{
+    await loadData();
+    let portalUser = JSON.parse(localStorage.getItem('sl_active_user')) || {};
+    let savedPartner = JSON.parse(localStorage.getItem('sl_partner_portal_user')) || {};
+    let partnerUsername = portalUser.role === 'Partner Lab' ? portalUser.username : savedPartner.username;
+    let partnerAccount = partnerUsername && fullDatabase.users && fullDatabase.users[partnerUsername];
+    
+    if(partnerAccount && partnerAccount.role === 'Partner Lab' && partnerAccount.active !== false) {
+        portalPartner = {username:partnerUsername,name:partnerAccount.name || partnerUsername,role:'Partner Lab',active:true};
+    } else {
+        localStorage.removeItem('sl_partner_portal_user');
+    }
+    
+    // 🔴 CHANGED: Button setup for Admin
+    if(portalUser.role === 'Super Admin' && portalUser.active !== false){ 
+        isAdmin=true; 
+        document.getElementById('staffLoginBtn').textContent = '↪ Admin Logout';
+    }
+    
+    renderPackages(); 
+    renderTests();
+};
+</script>
+</body>
+</html>

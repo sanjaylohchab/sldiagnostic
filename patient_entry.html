@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#102a56">
+    <title>SL Diagnostic - Patient Entry</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --navy:#102a56; --blue:#2f6fe4; --blue-soft:#e9f1ff; --bg:#f4f7fb; --card:#fff; --input:#f8faff; --text:#18243a; --muted:#6b7890; --line:#e1e9f3; --shadow:0 12px 30px rgba(30,62,110,.09); }
+        body.dark { --navy:#07162d; --blue:#5d9bff; --blue-soft:#19335b; --bg:#0c1524; --card:#131f32; --input:#0e192a; --text:#e7eefb; --muted:#9dacc3; --line:#26364d; --shadow:0 12px 30px rgba(0,0,0,.22); }
+        * { box-sizing:border-box; } body { min-width:320px; margin:0; font-family:'Poppins',sans-serif; color:var(--text); background:var(--bg); transition:background .25s,color .25s; } button,input,select { font:inherit; }
+        .topbar { position:sticky; top:0; z-index:20; padding:14px max(16px,calc((100vw - 980px)/2)); color:#fff; background:linear-gradient(115deg,var(--navy),#1f5cb5); box-shadow:0 4px 15px rgba(5,25,56,.15); }
+        .topbar-inner { display:flex; align-items:center; justify-content:space-between; max-width:980px; margin:auto; gap:13px; } .page-heading { display:flex; align-items:center; gap:11px; min-width:0; } .page-heading h1 { margin:0; overflow:hidden; font-size:17px; white-space:nowrap; text-overflow:ellipsis; } .page-heading span { display:block; color:#c9dcfa; margin-top:1px; font-size:10px; }
+        .header-actions { display:flex; gap:8px; } .header-btn { display:grid; place-items:center; width:36px; height:36px; padding:0; cursor:pointer; color:#fff; background:rgba(255,255,255,.13); border:1px solid rgba(255,255,255,.18); border-radius:10px; transition:.2s; } .header-btn:hover { background:rgba(255,255,255,.25); } .back-btn { width:auto; padding:0 11px; color:#fff; text-decoration:none; font-size:12px; font-weight:600; }
+        .container { width:min(980px,calc(100% - 32px)); margin:22px auto 34px; } .form-card { padding:23px; background:var(--card); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); }
+        .form-top { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid var(--line); } .form-top h2 { margin:0; font-size:17px; } .form-top p { margin:3px 0 0; color:var(--muted); font-size:11px; } .required-note { flex:0 0 auto; padding:5px 9px; color:var(--blue); background:var(--blue-soft); border-radius:20px; font-size:10px; font-weight:700; }
+        .section-title { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:24px 0 14px; font-size:14px; font-weight:700; } .section-title:first-of-type { margin-top:0; } .test-count { padding:5px 9px; color:var(--blue); background:var(--blue-soft); border-radius:20px; font-size:10px; white-space:nowrap; }
+        .grid-2,.grid-3,.grid-name { display:grid; gap:14px; margin-bottom:14px; } .grid-2 { grid-template-columns:1fr 1fr; } .grid-3 { grid-template-columns:1fr 1fr 1fr; } .grid-name { grid-template-columns:92px 1fr; margin:0; }
+        .form-group label { display:block; margin-bottom:6px; color:var(--muted); font-size:11px; font-weight:600; } .form-group input,.form-group select,.search-test { width:100%; height:43px; padding:0 12px; outline:none; color:var(--text); background:var(--input); border:1px solid var(--line); border-radius:10px; font-size:13px; transition:.2s; } .form-group input:focus,.form-group select:focus,.search-test:focus { background:var(--card); border-color:var(--blue); box-shadow:0 0 0 3px rgba(47,111,228,.13); }
+        .search-wrap { position:relative; margin-bottom:10px; } .search-wrap span { position:absolute; top:11px; left:12px; pointer-events:none; } .search-test { padding-left:35px; }
+        .test-list { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; max-height:272px; overflow-y:auto; padding:10px; background:var(--input); border:1px solid var(--line); border-radius:12px; } .test-list::-webkit-scrollbar { width:7px; } .test-list::-webkit-scrollbar-thumb { background:var(--line); border-radius:10px; }
+        .test-item { display:flex; align-items:center; gap:9px; min-height:42px; padding:9px; cursor:pointer; color:var(--text); background:var(--card); border:1px solid var(--line); border-radius:9px; font-size:11px; font-weight:500; transition:.18s; } .test-item:hover { border-color:var(--blue); } .test-item:has(input:checked) { color:var(--blue); background:var(--blue-soft); border-color:var(--blue); } .test-item input { width:16px; height:16px; margin:0; accent-color:var(--blue); } .empty-tests { grid-column:1/-1; padding:17px; color:var(--muted); text-align:center; font-size:12px; }
+        .action-area { display:grid; grid-template-columns:1fr 1fr; gap:11px; margin-top:21px; padding-top:18px; border-top:1px solid var(--line); } .btn { min-height:48px; padding:12px 16px; cursor:pointer; border-radius:11px; font-size:13px; font-weight:700; transition:.2s; } .btn:hover { transform:translateY(-2px); } .btn-primary { color:#fff; background:linear-gradient(135deg,var(--blue),#1d55bb); border:0; box-shadow:0 5px 12px rgba(47,111,228,.25); } .btn-secondary { color:var(--blue); background:var(--blue-soft); border:1px solid rgba(47,111,228,.25); } .btn:disabled { cursor:not-allowed; opacity:.65; transform:none; }
+        #loading { display:none; padding:38px; color:var(--blue); text-align:center; font-size:13px; font-weight:600; } .footer { margin-top:17px; color:var(--muted); text-align:center; font-size:10px; }
+        @media (max-width:720px) { .grid-3 { grid-template-columns:1fr 1fr; } .test-list { grid-template-columns:repeat(2,1fr); } }
+        @media (max-width:520px) { .topbar { padding:12px 14px; } .page-heading h1 { font-size:15px; } .page-heading span { display:none; } .back-btn { width:36px; padding:0; font-size:0; } .back-btn::after { content:'←'; font-size:20px; } .container { width:min(100% - 24px,980px); margin:13px auto 24px; } .form-card { padding:15px; border-radius:15px; } .form-top { margin-bottom:16px; padding-bottom:14px; } .form-top h2 { font-size:15px; } .required-note { font-size:9px; } .grid-2,.grid-3 { grid-template-columns:1fr; gap:11px; margin-bottom:11px; } .test-list { grid-template-columns:1fr; max-height:238px; } .action-area { grid-template-columns:1fr; gap:9px; margin-top:17px; } .btn { min-height:46px; } }
+    </style>
+</head>
+<body>
+    <script>
+        const staffSession = JSON.parse(localStorage.getItem('sl_active_user')) || {};
+        if (!staffSession.username || !['Super Admin','Staff'].includes(staffSession.role)) window.location.replace('login.html');
+    </script>
+    <header class="topbar">
+        <div class="topbar-inner">
+            <div class="page-heading"><a href="index.html" class="header-btn back-btn" title="Back to dashboard">← Back</a><div><h1>Patient Registration</h1><span>Create a new patient record</span></div></div>
+            <div class="header-actions"><button class="header-btn" id="themeToggle" onclick="toggleDarkMode()" title="Toggle dark mode" aria-label="Toggle dark mode">☾</button></div>
+        </div>
+    </header>
+
+    <main class="container">
+        <div id="loading">⏳ Syncing with database…</div>
+        <section class="form-card" id="formArea" style="display:none;">
+            <div class="form-top"><div><h2>Patient Details</h2><p>Fill the required details before selecting lab tests.</p></div><span class="required-note">* Required fields</span></div>
+
+            <div class="section-title">👤 Registration Information</div>
+            <div class="grid-2">
+                <div class="form-group"><label for="ptLabNo">Lab No. *</label><input type="text" id="ptLabNo" autocomplete="off" style="font-weight:700;"></div>
+                <div class="form-group"><label for="ptDate">Registration Date *</label><input type="date" id="ptDate"></div>
+            </div>
+            <div class="grid-2">
+                <div class="form-group"><label for="ptName">Patient Name *</label><div class="grid-name"><select id="ptPrefix" aria-label="Name prefix"><option value="Mr.">Mr.</option><option value="Mrs.">Mrs.</option><option value="Miss">Miss</option><option value="Master">Master</option><option value="Baby">Baby</option><option value="B/O">B/O</option><option value="Dr.">Dr.</option><option value="Prof.">Prof.</option></select><input type="text" id="ptName" placeholder="e.g. Rahul Kumar" autocomplete="name"></div></div>
+                <div class="form-group"><label for="ptPhone">Mobile Number</label><input type="tel" id="ptPhone" inputmode="numeric" maxlength="10" placeholder="10-digit number" autocomplete="tel"></div>
+            </div>
+            <div class="grid-3">
+                <div class="form-group"><label for="ptAge">Age *</label><input type="text" id="ptAge" placeholder="e.g. 28 or 6 Months"></div>
+                <div class="form-group"><label for="ptGender">Gender *</label><select id="ptGender"><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div>
+                <div class="form-group"><label for="ptDoc">Referred By</label><input type="text" id="ptDoc" value="Self" placeholder="e.g. Dr. Sharma"></div>
+            </div>
+            <div class="grid-2">
+                <div class="form-group"><label for="ptSource">Sample Source</label><select id="ptSource" onchange="togglePartnerField()"><option value="Patient">Direct Patient</option><option value="Partner Lab">Partner Lab</option></select></div>
+                <div class="form-group" id="partnerLabGroup" style="display:none;"><label for="ptPartnerLab">Partner Lab Name</label><input type="text" id="ptPartnerLab" placeholder="e.g. City Collection Lab"></div>
+            </div>
+
+            <div class="section-title"><span>🧪 Select Lab Tests</span><span class="test-count" id="testCount">0 tests selected</span></div>
+            <div class="search-wrap"><span>⌕</span><input type="search" class="search-test" id="searchTestInput" placeholder="Search test to add…" oninput="filterTests()"></div>
+            <div class="test-list" id="testListArea"></div>
+
+            <div class="action-area">
+                <button class="btn btn-secondary" type="button" onclick="savePatient('reports')">💾 Save &amp; View Reports</button>
+                <button class="btn btn-primary" type="button" onclick="savePatient('billing')">💳 Save &amp; Open Billing</button>
+            </div>
+        </section>
+        <div class="footer">SL Diagnostic System · Patient Registration</div>
+    </main>
+
+    <script>
+        const dbUrl = 'https://diagnostic-center-74aa4-default-rtdb.firebaseio.com/lab_data.json';
+        const patientsUrl = 'https://diagnostic-center-74aa4-default-rtdb.firebaseio.com/lab_data/patients.json';
+        const logsUrl = 'https://diagnostic-center-74aa4-default-rtdb.firebaseio.com/lab_data/logs.json';
+        let fullDatabase = {}; let editingIndex = null;
+        const auditUser = JSON.parse(localStorage.getItem('sl_active_user')) || {};
+        async function recordAudit(action, type) { try { let res = await fetch(logsUrl, {cache:'no-store'}); let logs = await res.json() || []; if (!Array.isArray(logs)) logs = Object.values(logs); logs.push({time:new Date().toLocaleString('en-IN'),user:auditUser.name || auditUser.username || 'Staff',action,type}); if (logs.length > 500) logs = logs.slice(-500); await fetch(logsUrl,{method:'PUT',body:JSON.stringify(logs),headers:{'Content-Type':'application/json'}}); } catch (e) { console.warn('Audit log could not be saved'); } }
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('edit_idx')) editingIndex = parseInt(urlParams.get('edit_idx'), 10);
+
+        function toggleDarkMode() { document.body.classList.toggle('dark'); localStorage.setItem('darkMode', document.body.classList.contains('dark')); document.getElementById('themeToggle').textContent = document.body.classList.contains('dark') ? '☀' : '☾'; }
+        if (localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark');
+        document.getElementById('themeToggle').textContent = document.body.classList.contains('dark') ? '☀' : '☾';
+        document.getElementById('ptPhone').addEventListener('input', function() { this.value = this.value.replace(/\D/g, '').slice(0, 10); });
+
+        async function init() {
+            document.getElementById('loading').style.display = 'block';
+            const today = new Date(); document.getElementById('ptDate').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            try {
+                const res = await fetch(dbUrl, { headers:{'Cache-Control':'no-cache'}, cache:'no-store' });
+                fullDatabase = await res.json() || { patients:[], tests:[] }; if (!fullDatabase.patients) fullDatabase.patients = []; if (!fullDatabase.tests) fullDatabase.tests = [];
+                renderTestCheckboxes();
+                if (editingIndex !== null && fullDatabase.patients[editingIndex]) loadPatientData(fullDatabase.patients[editingIndex]); else generateLabNo();
+                document.getElementById('loading').style.display = 'none'; document.getElementById('formArea').style.display = 'block';
+            } catch (error) { alert('Database Connection Error. Please check your internet.'); }
+        }
+        function generateLabNo() { const today = new Date(); const prefix = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`; const count = fullDatabase.patients.filter(p => p && p.lab_no && p.lab_no.startsWith(prefix)).length; document.getElementById('ptLabNo').value = prefix + String(count + 1).padStart(2, '0'); }
+        function renderTestCheckboxes() { const area = document.getElementById('testListArea'); const tests = [...fullDatabase.tests].sort((a,b) => a.name.localeCompare(b.name)); if (!tests.length) { area.innerHTML = '<div class="empty-tests">No tests found. Please add tests in Test Master first.</div>'; return; } area.innerHTML = tests.map(t => `<label class="test-item" data-name="${t.name.toUpperCase()}"><input type="checkbox" class="test-cb" value="${t.name}" onchange="updateTestCount()"><span>${t.name}</span></label>`).join(''); updateTestCount(); }
+        function updateTestCount() { const count = document.querySelectorAll('.test-cb:checked').length; document.getElementById('testCount').textContent = `${count} test${count === 1 ? '' : 's'} selected`; }
+        function filterTests() { const query = document.getElementById('searchTestInput').value.toUpperCase(); document.querySelectorAll('.test-item').forEach(item => item.style.display = item.dataset.name.includes(query) ? 'flex' : 'none'); }
+        function togglePartnerField() { const isPartner = document.getElementById('ptSource').value === 'Partner Lab'; document.getElementById('partnerLabGroup').style.display = isPartner ? 'block' : 'none'; if (!isPartner) document.getElementById('ptPartnerLab').value = ''; }
+        function loadPatientData(p) { if (p.prefix) { document.getElementById('ptPrefix').value = p.prefix; document.getElementById('ptName').value = p.raw_name || ''; } else document.getElementById('ptName').value = p.name || ''; document.getElementById('ptLabNo').value = p.lab_no || ''; document.getElementById('ptPhone').value = p.phone || ''; document.getElementById('ptAge').value = p.age || ''; document.getElementById('ptGender').value = p.gender || 'Male'; document.getElementById('ptDoc').value = p.doctor || 'Self'; document.getElementById('ptSource').value = p.sample_source || 'Patient'; document.getElementById('ptPartnerLab').value = p.partner_lab || ''; togglePartnerField(); if (p.date) { const parts = p.date.split('-'); if (parts.length === 3) document.getElementById('ptDate').value = `${parts[2]}-${parts[1]}-${parts[0]}`; } document.querySelectorAll('.test-cb').forEach(cb => cb.checked = !!(p.selected_tests && p.selected_tests.includes(cb.value))); updateTestCount(); }
+        async function savePatient(destination) {
+            const labNo = document.getElementById('ptLabNo').value.trim(), prefix = document.getElementById('ptPrefix').value, rawName = document.getElementById('ptName').value.trim(), phone = document.getElementById('ptPhone').value.trim(), age = document.getElementById('ptAge').value.trim(), gender = document.getElementById('ptGender').value, doctor = document.getElementById('ptDoc').value.trim(), dateVal = document.getElementById('ptDate').value, sampleSource = document.getElementById('ptSource').value, partnerLab = document.getElementById('ptPartnerLab').value.trim();
+            const selectedTests = Array.from(document.querySelectorAll('.test-cb:checked')).map(cb => cb.value);
+            if (!labNo) return alert('Lab Number cannot be empty!'); if (!rawName || !age || !dateVal) return alert('Please fill Name, Age, and Date!'); if (!selectedTests.length) return alert('Please select at least one Test!');
+            if (sampleSource === 'Partner Lab' && !partnerLab) return alert('Please enter the partner lab name.');
+            const dParts = dateVal.split('-'); const patientData = { lab_no:labNo, name:`${prefix} ${rawName}`, prefix, raw_name:rawName, phone, age, gender, doctor:doctor || 'Self', sample_source:sampleSource, partner_lab:partnerLab, date:`${dParts[2]}-${dParts[1]}-${dParts[0]}`, selected_tests:selectedTests, test_results:{} };
+            document.getElementById('loading').style.display = 'block'; document.getElementById('formArea').style.display = 'none';
+            try { const isEditing = editingIndex !== null; if (isEditing) { patientData.test_results = fullDatabase.patients[editingIndex].test_results || {}; fullDatabase.patients[editingIndex] = patientData; } else fullDatabase.patients.push(patientData); await fetch(patientsUrl, { method:'PUT', body:JSON.stringify(fullDatabase.patients), headers:{'Content-Type':'application/json'} }); await recordAudit(`${isEditing ? 'Updated' : 'Registered'} patient ${patientData.name} (Lab No: ${labNo})`, 'patient'); window.location.href = destination === 'billing' ? `billing.html?patient=${encodeURIComponent(labNo)}` : 'reports.html'; }
+            catch (error) { alert('Save Error: Please check your connection.'); document.getElementById('loading').style.display = 'none'; document.getElementById('formArea').style.display = 'block'; }
+        }
+        window.onload = init;
+    </script>
+</body>
+</html>

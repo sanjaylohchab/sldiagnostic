@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab Test & Profile Management</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1E293B; --accent: #3B82F6; --bg: #F1F5F9; 
+            --card: #FFFFFF; --border: #E2E8F0; --text: #334155;
+            --orange: #F59E0B; --red: #EF4444; --dark-grey: #475569;
+        }
+
+        /* 🌙 DARK MODE VARIABLES */
+        body.dark {
+            --primary: #E2E8F0; --accent: #3B82F6; --bg: #0F172A; 
+            --card: #1E293B; --border: #334155; --text: #F1F5F9;
+            --dark-grey: #94A3B8;
+        }
+
+        body { font-family: 'Poppins', sans-serif; background-color: var(--bg); margin: 0; padding: 0; color: var(--text); transition: background-color 0.3s, color 0.3s; }
+        
+        /* HEADER */
+        .header { background: var(--card); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 4px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 100; border-bottom: 2px solid var(--accent); transition: 0.3s;}
+        .header h2 { margin: 0; font-size: 18px; color: var(--primary); display: flex; align-items: center; gap: 8px;}
+        .back-btn { background: var(--accent); color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; }
+        .dark-btn { background: #475569; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; transition: 0.2s;}
+        .dark-btn:hover { background: #334155; }
+
+        /* MAIN LAYOUT */
+        .main-wrapper { display: flex; gap: 20px; padding: 20px; max-width: 1400px; margin: 0 auto; align-items: flex-start; }
+        
+        /* LEFT SIDEBAR (FORM) */
+        .sidebar { flex: 0 0 320px; background: var(--card); border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); position: sticky; top: 80px; transition: 0.3s;}
+        .sidebar-title { text-align: center; color: var(--orange); font-size: 18px; font-weight: 700; margin-bottom: 20px; border-bottom: 1px dashed var(--border); padding-bottom: 10px;}
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--dark-grey); margin-bottom: 5px; }
+        .form-group input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-family: inherit; font-size: 13px; outline: none; background: var(--card); color: var(--text);}
+        .form-group input:focus { border-color: var(--accent); }
+        body.dark .form-group input { background: #0F172A; }
+        
+        .btn-save { width: 100%; background: var(--orange); color: white; border: none; padding: 12px; border-radius: 6px; font-weight: 700; font-size: 14px; cursor: pointer; transition: 0.2s; margin-top: 10px;}
+        .btn-save:hover { background: #D97706; }
+        .btn-clear { width: 100%; background: transparent; color: var(--dark-grey); border: 1px solid var(--border); padding: 8px; border-radius: 6px; font-size: 12px; cursor: pointer; margin-top: 10px; font-weight: 600;}
+
+        /* RIGHT CONTENT (TABLE) */
+        .content { flex: 1; background: var(--card); border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: 0.3s;}
+        .content-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--bg); padding-bottom: 15px; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;}
+        .content-header h3 { margin: 0; color: var(--accent); font-size: 18px; width: 100%;}
+        
+        .top-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; width: 100%; justify-content: space-between;}
+        .action-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+        
+        .search-box { display: flex; align-items: center; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; width: 280px; }
+        .search-box input { border: none; outline: none; width: 100%; font-size: 13px; padding: 5px; background: transparent; color: var(--text);}
+        
+        table { width: 100%; border-collapse: collapse; }
+        th { background: var(--bg); color: var(--text); padding: 12px; text-align: left; font-size: 13px; font-weight: 600; border-bottom: 2px solid var(--border);}
+        td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; color: var(--text); font-weight: 500;}
+        tr:hover { background: var(--bg); }
+        
+        .rate-text { color: #10B981; font-weight: 700; }
+        .cost-text { color: #EF4444; font-weight: 700; }
+
+        .btn-group { display: flex; gap: 5px; }
+        .action-btn { padding: 6px 12px; border: none; border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer; color: white; display: flex; align-items: center; gap: 4px;}
+        .btn-edit { background: var(--accent); }
+        .btn-param { background: #475569; }
+        .btn-delete { background: var(--red); }
+        .btn-success { background: #10B981; }
+        .btn-purple { background: #8B5CF6; }
+
+        /* 🔬 PARAMETER MODAL */
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; display: none; justify-content: center; align-items: center; }
+        .modal { background: var(--card); width: 900px; max-height: 90vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px rgba(0,0,0,0.5); transition: 0.3s;}
+        .modal-header { background: var(--primary); padding: 15px 20px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); }
+        .modal-header h3 { margin: 0; color: white; }
+        body.dark .modal-header { background: #0F172A; }
+        .modal-body { padding: 20px; overflow-y: auto; background: var(--bg); flex: 1;}
+        
+        /* Add Param Bar */
+        .add-param-bar { background: var(--card); padding: 15px; border-radius: 8px; display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px; border: 1px solid var(--border);}
+        .add-param-bar .input-group { flex: 1; }
+        .add-param-bar label { font-size: 11px; font-weight: 600; color: var(--dark-grey); display: block; margin-bottom: 4px;}
+        .add-param-bar input { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; outline: none; background: var(--bg); color: var(--text);}
+        body.dark .add-param-bar input { background: #0F172A; }
+        .btn-add-param { background: #10B981; color: white; border: none; padding: 9px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; height: 35px; transition: 0.2s;}
+
+        /* Param List */
+        .param-list { display: flex; flex-direction: column; gap: 8px; }
+        .param-item { background: var(--card); padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02);}
+        .param-info { font-size: 13px; font-weight: 500; color: var(--text); }
+        .param-meta { color: var(--dark-grey); font-size: 11px; margin-left: 10px; }
+        .param-actions { display: flex; gap: 5px; }
+        .p-btn { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;}
+        .p-btn:hover { background: var(--border); }
+        .p-btn-edit { color: var(--accent); border-color: var(--accent); }
+        .p-btn-del { background: #FEF2F2; color: #EF4444; border-color: #FECACA; }
+        body.dark .p-btn-del { background: #450a0a; border-color: #7f1d1d;}
+
+        #loading { display: none; text-align: center; padding: 20px; color: var(--accent); font-weight: bold; }
+    </style>
+    <style>
+        :root { --primary:#102a56; --accent:#2f6fe4; --bg:#f4f7fb; --card:#fff; --border:#e1e9f3; --text:#18243a; --orange:#d57b00; --red:#dc4c64; --dark-grey:#6b7890; --shadow:0 12px 30px rgba(30,62,110,.09); }
+        body.dark { --primary:#07162d; --accent:#5d9bff; --bg:#0c1524; --card:#131f32; --border:#26364d; --text:#e7eefb; --dark-grey:#9dacc3; }
+        body { min-width:320px; color:var(--text); background:var(--bg); }
+        .header { min-height:68px; padding:13px max(16px,calc((100vw - 1200px)/2)); color:#fff; background:linear-gradient(115deg,var(--primary),#1f5cb5); border:0; box-shadow:0 4px 15px rgba(5,25,56,.15); }
+        .header h2 { color:#fff; font-size:17px; } .header h2 small { display:block; margin-top:2px; color:#c9dcfa; font-size:10px; font-weight:500; }
+        .back-btn,.dark-btn { display:grid; place-items:center; min-height:36px; padding:0 11px; color:#fff; background:rgba(255,255,255,.13); border:1px solid rgba(255,255,255,.18); border-radius:10px; box-shadow:none; }
+        .dark-btn:hover,.back-btn:hover { background:rgba(255,255,255,.25); }
+        .main-wrapper { display:grid; grid-template-columns:330px minmax(0,1fr); gap:17px; width:min(1200px,calc(100% - 32px)); padding:21px 0 34px; }
+        .sidebar,.content { background:var(--card); border:1px solid var(--border); border-radius:17px; box-shadow:var(--shadow); }
+        .sidebar { top:88px; padding:19px; } .sidebar-title { margin:0 0 18px; padding:0 0 13px; color:var(--text); font-size:15px; text-align:left; border-bottom:1px solid var(--border); }
+        .sidebar-title::before { content:'＋'; display:inline-grid; place-items:center; width:25px; height:25px; margin-right:8px; color:var(--accent); background:var(--bg); border-radius:8px; font-size:17px; vertical-align:middle; }
+        .form-group { margin-bottom:13px; } .form-group label { color:var(--dark-grey); font-size:11px; } .form-group input { height:42px; padding:0 11px; color:var(--text); background:var(--bg); border:1px solid var(--border); border-radius:9px; } .form-group input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(47,111,228,.13); } body.dark .form-group input { background:#0e192a; }
+        .btn-save { margin-top:5px; padding:12px; color:#fff; background:linear-gradient(135deg,var(--accent),#1d55bb); border-radius:10px; box-shadow:0 5px 12px rgba(47,111,228,.25); } .btn-save:hover { background:var(--accent); } .btn-clear { padding:10px; color:var(--dark-grey); border:1px solid var(--border); border-radius:9px; }
+        .content { min-width:0; padding:19px; } .content-header { padding-bottom:15px; margin-bottom:15px; border-bottom:1px solid var(--border); } .content-header h3 { color:var(--text); font-size:16px; } .content-header h3 small { display:block; margin-top:3px; color:var(--dark-grey); font-size:10px; font-weight:500; }
+        .top-actions { align-items:center; } .action-buttons { gap:7px; } .action-btn { min-height:33px; padding:7px 9px; border-radius:8px; font-size:10px; } .btn-success { background:#159a63; } .btn-edit { background:var(--accent); } .btn-param { background:#53657e; } .btn-delete { background:var(--red); } .btn-purple { background:#8c3fd0; }
+        .filters { display:flex; gap:8px; width:100%; } .search-box { width:auto; flex:1; min-width:145px; padding:5px 9px; color:var(--dark-grey); background:var(--bg); border:1px solid var(--border); border-radius:9px; } .search-box input { color:var(--text); } .department-filter { min-width:150px; height:37px; padding:0 9px; color:var(--text); background:var(--bg); border:1px solid var(--border); border-radius:9px; outline:none; font-size:11px; }
+        .table-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:12px; } table { min-width:680px; } th { padding:11px 13px; color:var(--dark-grey); background:var(--bg); border-bottom:1px solid var(--border); font-size:10px; letter-spacing:.35px; text-transform:uppercase; } td { padding:12px 13px; border-bottom:1px solid var(--border); font-size:12px; } tr:hover { background:var(--bg); } .rate-text { color:#159a63; } .cost-text { color:var(--red); } .test-dept { display:block; margin-top:2px; color:var(--dark-grey); font-size:9px; font-weight:500; } .param-badge { display:inline-block; min-width:26px; padding:3px 7px; color:var(--accent); background:rgba(47,111,228,.12); border-radius:20px; text-align:center; font-size:10px; font-weight:700; }
+        #loading { padding:15px; font-size:12px; } .empty-tests { padding:35px!important; color:var(--dark-grey); text-align:center; }
+        .overlay { padding:15px; background:rgba(3,15,34,.68); } .modal { width:min(900px,100%); border:1px solid var(--border); border-radius:16px; } .modal-header { padding:15px 18px; background:linear-gradient(115deg,var(--primary),#1f5cb5); } .modal-header h3 { font-size:15px; } .modal-body { padding:18px; background:var(--bg); } .add-param-bar { display:grid; grid-template-columns:1.2fr .7fr 1fr auto; gap:9px; padding:14px; background:var(--card); border:1px solid var(--border); border-radius:12px; } .add-param-bar input { height:37px; color:var(--text); background:var(--bg); border:1px solid var(--border); border-radius:8px; } .btn-add-param { height:37px; padding:0 15px; background:#159a63; border-radius:8px; } .param-item { padding:11px 12px; background:var(--card); border:1px solid var(--border); border-radius:10px; box-shadow:none; } .p-btn { min-height:29px; color:var(--text); background:var(--bg); border:1px solid var(--border); border-radius:6px; } .p-btn-edit { color:var(--accent); border-color:var(--accent); } .p-btn-del { color:var(--red); background:#fff0f2; border-color:#ffd5dc; }
+        @media (max-width:900px) { .main-wrapper { grid-template-columns:1fr; } .sidebar { position:static; } }
+        @media (max-width:620px) { .header h2 small { display:none; } .main-wrapper { width:min(100% - 24px,1200px); padding-top:13px; } .header { min-height:59px; } .back-btn { width:36px; padding:0; font-size:0; } .back-btn::after { content:'←'; font-size:20px; } .dark-btn { width:36px; padding:0; font-size:0; } .dark-btn::after { content:'☾'; font-size:19px; } .content,.sidebar { padding:15px; border-radius:15px; } .filters { flex-direction:column; } .department-filter { width:100%; } .top-actions { align-items:stretch; } .action-buttons { display:grid; grid-template-columns:1fr 1fr; } .action-btn { justify-content:center; } .add-param-bar { grid-template-columns:1fr; } .btn-add-param { width:100%; } .param-item { align-items:flex-start; flex-direction:column; gap:9px; } .param-actions { flex-wrap:wrap; } }
+    </style>
+</head>
+<body>
+    <script>
+        const staffSession = JSON.parse(localStorage.getItem('sl_active_user')) || {};
+        if (!staffSession.username || !['Super Admin','Staff'].includes(staffSession.role)) window.location.replace('login.html');
+    </script>
+
+    <div class="header">
+        <h2>🧪 Lab Test &amp; Profile Management <small>Manage tests, rates and report parameters</small></h2>
+        <div style="display:flex; gap:10px;">
+            <button class="dark-btn" onclick="toggleDarkMode()">🌙 Dark Mode</button>
+            <a href="index.html" class="back-btn">⬅ Dashboard</a>
+        </div>
+    </div>
+
+    <div class="main-wrapper">
+        
+        <div class="sidebar">
+            <div class="sidebar-title" id="formTitle">Add New Test</div>
+            
+            <div class="form-group">
+                <label>Test Name (e.g., CBC):</label>
+                <input type="text" id="tName" placeholder="Enter test name">
+            </div>
+            <div class="form-group">
+                <label>Department/Heading (e.g., SEROLOGY):</label>
+                <input type="text" id="tDept" placeholder="Enter department">
+            </div>
+            <div class="form-group">
+                <label>Patient Rate (Rs.):</label>
+                <input type="number" id="tPRate" placeholder="0">
+            </div>
+            <div class="form-group">
+                <label>Partner Lab Rate (Rs.):</label>
+                <input type="number" id="tPartnerRate" placeholder="0">
+            </div>
+            <div class="form-group">
+                <label>Outsource Lab Cost (Rs.):</label>
+                <input type="number" id="tLRate" placeholder="0">
+            </div>
+            <div class="form-group">
+                <label>Default Outsource Lab (optional):</label>
+                <input type="text" id="tOutsourceLab" placeholder="e.g. ABC Reference Lab">
+            </div>
+            
+            <button class="btn-save" id="btnSaveTest" onclick="saveMasterTest()">Save Test</button>
+            <button class="btn-clear" onclick="clearForm()">Clear / Cancel Edit</button>
+        </div>
+
+        <div class="content">
+            <div class="content-header">
+                <h3>Saved Tests &amp; Parameter Setup <small><span id="testCount">0</span> tests in your laboratory catalog</small></h3>
+                
+                <div class="top-actions">
+                    <div class="action-buttons">
+                        <button class="action-btn btn-success" onclick="exportToExcel()">📥 Excel Export</button>
+                        <label class="action-btn btn-edit" style="cursor:pointer; margin:0;">
+                            📤 Excel Import
+                            <input type="file" id="excelUpload" accept=".xlsx,.csv" style="display:none;" onchange="importExcel(event)">
+                        </label>
+                        <button class="action-btn btn-param" onclick="backupData()">💾 Backup</button>
+                        <label class="action-btn btn-purple" style="cursor:pointer; margin:0;">
+                            📂 Restore
+                            <input type="file" id="backupUpload" accept=".json" style="display:none;" onchange="restoreBackup(event)">
+                        </label>
+                    </div>
+                    <div class="filters">
+                        <div class="search-box">🔍 <input type="text" id="searchBox" placeholder="Search test name..." onkeyup="filterTable()"></div>
+                        <select class="department-filter" id="departmentFilter" onchange="filterTable()"><option value="">All Departments</option></select>
+                    </div>
+                </div>
+            </div>
+
+            <div id="loading">⏳ Synchronizing Data...</div>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th width="5%">S.No</th>
+                            <th width="30%">Test Name</th>
+                            <th width="15%">Patient Rate</th>
+                            <th width="14%">Partner Rate</th>
+                            <th width="14%">Outsource Cost</th>
+                            <th width="12%">Params</th>
+                            <th width="20%">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="testTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="overlay" id="paramOverlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="paramModalTitle">Profile: CBC</h3>
+                <button onclick="closeParams()" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;">✕</button>
+            </div>
+            <div class="modal-body">
+                
+                <div class="add-param-bar">
+                    <div class="input-group">
+                        <label>Parameter Name (e.g. Hb):</label>
+                        <input type="text" id="pAddName" placeholder="Parameter Name">
+                    </div>
+                    <div class="input-group">
+                        <label>Unit (e.g. g/dL):</label>
+                        <input type="text" id="pAddUnit" placeholder="Unit">
+                    </div>
+                    <div class="input-group">
+                        <label>Normal Range:</label>
+                        <input type="text" id="pAddRange" placeholder="Range">
+                    </div>
+                    <button class="btn-add-param" id="btnSaveParam" onclick="saveParameter()">+ Add</button>
+                </div>
+
+                <!-- 🔥 DETAILED REFERENCE RANGE TABLE / CLINICAL NOTE BOX (AB SABSE UPAR) -->
+                <div style="margin-bottom: 16px; background: var(--card); padding: 14px; border-radius: 12px; border: 1px solid var(--border);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+                        <label style="font-size:12px; font-weight:700; color:var(--primary); margin:0;">📝 Detailed Reference Range Table / Clinical Note (Optional)</label>
+                        <button type="button" class="p-btn p-btn-edit" onclick="insertTableTemplate()">📋 Insert Table Format</button>
+                    </div>
+                    <textarea id="testClinicalNote" rows="5" placeholder="Yahan Clinical Significance, Method ya | Gender | Age | Range | wala table likhein..." style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:12px; box-sizing:border-box; background:var(--bg); color:var(--text); resize:vertical;"></textarea>
+                    <button type="button" class="btn-add-param" style="margin-top:8px; width:100%;" onclick="saveClinicalNote()">💾 Save Note / Table</button>
+                </div>
+
+                <div class="param-list" id="paramListArea"></div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const dbUrl = "https://diagnostic-center-74aa4-default-rtdb.firebaseio.com/lab_data.json";
+        const testTargetUrl = "https://diagnostic-center-74aa4-default-rtdb.firebaseio.com/lab_data/tests.json";
+        
+        let fullDatabase = {};
+        let editingIndex = null;
+        let currentParamTestIndex = null;
+        let editingParamIndex = null; 
+
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark');
+            localStorage.setItem('sl_dark_mode', document.body.classList.contains('dark'));
+        }
+        if (localStorage.getItem('sl_dark_mode') === 'true') {
+            document.body.classList.add('dark');
+        }
+
+        async function fetchTests() {
+            document.getElementById('loading').style.display = 'block';
+            try {
+                let response = await fetch(dbUrl + "?nocache=" + new Date().getTime(), { cache: "no-store" });
+                fullDatabase = await response.json() || { tests: [], patients: [] };
+                if (!fullDatabase.tests) fullDatabase.tests = [];
+                renderDepartmentFilter();
+                renderTable();
+            } catch (error) {
+                alert("Database Connection Error!");
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function renderTable() {
+            let tbody = document.getElementById('testTableBody');
+            tbody.innerHTML = '';
+            document.getElementById('testCount').innerText = fullDatabase.tests.length;
+            if (fullDatabase.tests.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-tests">No tests added yet. Use the Add New Test form to create your first test.</td></tr>';
+                return;
+            }
+            
+            fullDatabase.tests.forEach((t, i) => {
+                let pCount = t.parameters ? t.parameters.length : 0;
+                let row = `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td style="color:var(--accent); font-weight:600;">${t.name.toUpperCase()}<span class="test-dept">${t.department || 'No department'}</span></td>
+                        <td class="rate-text">₹ ${t.patient_rate || 0}</td>
+                        <td class="rate-text">₹ ${t.partner_lab_rate ?? t.patient_rate ?? 0}</td>
+                        <td class="cost-text">₹ ${t.lab_cost || 0}</td>
+                        <td><span class="param-badge">${pCount}</span></td>
+                        <td>
+                            <div class="btn-group">
+                                <button class="action-btn btn-edit" onclick="loadTestToForm(${i})">✏️ Edit</button>
+                                <button class="action-btn btn-param" onclick="openParams(${i})">⚙️ Param</button>
+                                <button class="action-btn btn-delete" onclick="deleteMasterTest(${i})">🗑️</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+
+        function renderDepartmentFilter() {
+            let select = document.getElementById('departmentFilter');
+            let current = select.value;
+            let departments = [...new Set(fullDatabase.tests.map(t => (t.department || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+            select.innerHTML = '<option value="">All Departments</option>' + departments.map(d => `<option value="${d}">${d}</option>`).join('');
+            if (departments.includes(current)) select.value = current;
+        }
+
+        function loadTestToForm(index) {
+            editingIndex = index;
+            let t = fullDatabase.tests[index];
+            
+            document.getElementById('formTitle').innerText = "Editing: " + t.name;
+            document.getElementById('formTitle').style.color = "var(--accent)";
+            document.getElementById('btnSaveTest').innerText = "Update Test";
+            
+            document.getElementById('tName').value = t.name;
+            document.getElementById('tDept').value = t.department || "";
+            document.getElementById('tPRate').value = t.patient_rate || 0;
+            document.getElementById('tPartnerRate').value = t.partner_lab_rate ?? t.patient_rate ?? 0;
+            document.getElementById('tLRate').value = t.lab_cost || 0;
+            document.getElementById('tOutsourceLab').value = t.outsource_lab || '';
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function clearForm() {
+            editingIndex = null;
+            document.getElementById('formTitle').innerText = "Add New Test";
+            document.getElementById('formTitle').style.color = "var(--orange)";
+            document.getElementById('btnSaveTest').innerText = "Save Test";
+            
+            document.getElementById('tName').value = "";
+            document.getElementById('tDept').value = "";
+            document.getElementById('tPRate').value = "";
+            document.getElementById('tPartnerRate').value = "";
+            document.getElementById('tLRate').value = "";
+            document.getElementById('tOutsourceLab').value = "";
+        }
+
+        async function saveMasterTest() {
+            let name = document.getElementById('tName').value.trim();
+            if(!name) { alert("Test Name is required!"); return; }
+
+            let dept = document.getElementById('tDept').value.trim();
+            let pRate = parseFloat(document.getElementById('tPRate').value) || 0;
+            let partnerRate = parseFloat(document.getElementById('tPartnerRate').value) || 0;
+            let lRate = parseFloat(document.getElementById('tLRate').value) || 0;
+            let outsourceLab = document.getElementById('tOutsourceLab').value.trim();
+
+            document.getElementById('loading').style.display = 'block';
+
+            if (editingIndex !== null) {
+                fullDatabase.tests[editingIndex].name = name;
+                fullDatabase.tests[editingIndex].department = dept;
+                fullDatabase.tests[editingIndex].patient_rate = pRate;
+                fullDatabase.tests[editingIndex].partner_lab_rate = partnerRate;
+                fullDatabase.tests[editingIndex].lab_cost = lRate;
+                fullDatabase.tests[editingIndex].outsource_lab = outsourceLab;
+            } else {
+                fullDatabase.tests.push({
+                    name: name, department: dept, patient_rate: pRate, partner_lab_rate: partnerRate, lab_cost: lRate, outsource_lab: outsourceLab, parameters: []
+                });
+            }
+
+            try {
+                await fetch(testTargetUrl, { method: 'PUT', body: JSON.stringify(fullDatabase.tests) });
+                clearForm();
+                renderDepartmentFilter();
+                renderTable();
+            } catch(e) { alert("Error saving test!"); }
+            finally { document.getElementById('loading').style.display = 'none'; }
+        }
+
+        async function deleteMasterTest(index) {
+            if(confirm("Are you sure you want to delete this test?")) {
+                fullDatabase.tests.splice(index, 1);
+                document.getElementById('loading').style.display = 'block';
+                await fetch(testTargetUrl, { method: 'PUT', body: JSON.stringify(fullDatabase.tests) });
+                document.getElementById('loading').style.display = 'none';
+                if(editingIndex === index) clearForm();
+                renderDepartmentFilter();
+                renderTable();
+            }
+        }
+
+        function filterTable() {
+            let val = document.getElementById('searchBox').value.toUpperCase();
+            let department = document.getElementById('departmentFilter').value;
+            let rows = document.querySelectorAll('#testTableBody tr');
+            rows.forEach(r => {
+                if (!r.cells[1]) return;
+                let text = r.cells[1].innerText.toUpperCase();
+                let test = fullDatabase.tests[Number(r.cells[0].innerText) - 1];
+                let departmentMatches = !department || (test && test.department === department);
+                r.style.display = text.includes(val) && departmentMatches ? "" : "none";
+            });
+        }
+
+        function openParams(index) {
+            currentParamTestIndex = index;
+            editingParamIndex = null;
+            let t = fullDatabase.tests[index];
+            document.getElementById('paramModalTitle').innerText = "Profile: " + t.name.toUpperCase();
+            
+            resetParamForm();
+            document.getElementById('testClinicalNote').value = t.clinical_note || "";
+            renderParamsList();
+            document.getElementById('paramOverlay').style.display = 'flex';
+        }
+
+        function closeParams() {
+            document.getElementById('paramOverlay').style.display = 'none';
+            currentParamTestIndex = null;
+            editingParamIndex = null;
+            renderTable(); 
+        }
+
+        function renderParamsList() {
+            let area = document.getElementById('paramListArea');
+            area.innerHTML = "";
+            
+            let params = fullDatabase.tests[currentParamTestIndex].parameters;
+            if(!params || params.length === 0) {
+                area.innerHTML = "<div style='text-align:center; color:#94A3B8; padding:20px;'>No parameters added yet.</div>";
+                return;
+            }
+
+            params.forEach((p, i) => {
+                area.innerHTML += `
+                    <div class="param-item">
+                        <div class="param-info">
+                            ${i + 1}. ${p.name} 
+                            <span class="param-meta">| Unit: <b>${p.unit || '-'}</b> | Range: <b>${p.range || '-'}</b></span>
+                        </div>
+                        <div class="param-actions">
+                            <button class="p-btn" onclick="moveParam(${i}, -1)" title="Move Up">↑</button>
+                            <button class="p-btn" onclick="moveParam(${i}, 1)" title="Move Down">↓</button>
+                            <button class="p-btn p-btn-edit" onclick="editParam(${i})" title="Edit">✏️ Edit</button>
+                            <button class="p-btn p-btn-del" onclick="deleteParam(${i})" title="Delete">X</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function editParam(pIndex) {
+            editingParamIndex = pIndex;
+            let p = fullDatabase.tests[currentParamTestIndex].parameters[pIndex];
+            
+            document.getElementById('pAddName').value = p.name;
+            document.getElementById('pAddUnit').value = p.unit || "";
+            document.getElementById('pAddRange').value = p.range || "";
+            
+            let btn = document.getElementById('btnSaveParam');
+            btn.innerText = "Update";
+            btn.style.background = "var(--accent)"; 
+        }
+
+        function resetParamForm() {
+            editingParamIndex = null;
+            document.getElementById('pAddName').value = "";
+            document.getElementById('pAddUnit').value = "";
+            document.getElementById('pAddRange').value = "";
+            
+            let btn = document.getElementById('btnSaveParam');
+            btn.innerText = "+ Add";
+            btn.style.background = "#10B981"; 
+        }
+
+        async function saveParameter() {
+            let pName = document.getElementById('pAddName').value.trim();
+            let pUnit = document.getElementById('pAddUnit').value.trim();
+            let pRange = document.getElementById('pAddRange').value.trim();
+
+            if(!pName) { alert("Parameter Name is required!"); return; }
+
+            if(!fullDatabase.tests[currentParamTestIndex].parameters) {
+                fullDatabase.tests[currentParamTestIndex].parameters = [];
+            }
+
+            if (editingParamIndex !== null) {
+                fullDatabase.tests[currentParamTestIndex].parameters[editingParamIndex] = {
+                    name: pName, unit: pUnit, range: pRange
+                };
+            } else {
+                fullDatabase.tests[currentParamTestIndex].parameters.push({
+                    name: pName, unit: pUnit, range: pRange
+                });
+            }
+
+            resetParamForm();
+            document.getElementById('pAddName').focus();
+
+            renderParamsList();
+            await saveToDatabaseSilent();
+        }
+
+        async function deleteParam(pIndex) {
+            fullDatabase.tests[currentParamTestIndex].parameters.splice(pIndex, 1);
+            if(editingParamIndex === pIndex) resetParamForm();
+            renderParamsList();
+            await saveToDatabaseSilent();
+        }
+
+        async function moveParam(pIndex, direction) {
+            let params = fullDatabase.tests[currentParamTestIndex].parameters;
+            if (direction === -1 && pIndex > 0) {
+                let temp = params[pIndex];
+                params[pIndex] = params[pIndex - 1];
+                params[pIndex - 1] = temp;
+            } else if (direction === 1 && pIndex < params.length - 1) {
+                let temp = params[pIndex];
+                params[pIndex] = params[pIndex + 1];
+                params[pIndex + 1] = temp;
+            } else {
+                return; 
+            }
+            renderParamsList();
+            await saveToDatabaseSilent();
+        }
+
+        async function saveToDatabaseSilent() {
+            try {
+                await fetch(testTargetUrl, { method: 'PUT', body: JSON.stringify(fullDatabase.tests) });
+            } catch(e) { console.error("Auto-save failed"); }
+        }
+
+        function insertTableTemplate() {
+            let box = document.getElementById('testClinicalNote');
+            let sample = `Reference Range:\n| GENDER | AGE | RANGE (ng/mL) |\n| MALE | <24 MONTHS | 14-466 |\n| MALE | 24 MONTHS-12 YEARS | 7.4-243 |\n| FEMALE | 13-45 YEARS | 0.9-9.5 |\n\nClinical Significance:\nYahan apna clinical note likhein...\n\nMethod: CHEMILUMINESCENCE IMMUNOASSAY (CLIA)`;
+            box.value = box.value ? (box.value + "\n\n" + sample) : sample;
+        }
+
+        async function saveClinicalNote() {
+            if (currentParamTestIndex === null) return;
+            fullDatabase.tests[currentParamTestIndex].clinical_note = document.getElementById('testClinicalNote').value.trim();
+            await saveToDatabaseSilent();
+            alert("✅ Clinical Note / Table Saved!");
+        }
+
+        function backupData() {
+            const dataStr = JSON.stringify(fullDatabase, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `SL_Diagnostic_Backup_${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+        }
+
+        async function restoreBackup(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async function(ev) {
+                try {
+                    let parsedData = JSON.parse(ev.target.result);
+                    if(confirm("Warning: This will overwrite your current live database. Continue?")) {
+                        document.getElementById('loading').style.display = 'block';
+                        fullDatabase = parsedData;
+                        await fetch(dbUrl, { method: 'PUT', body: JSON.stringify(fullDatabase) });
+                        document.getElementById('loading').style.display = 'none';
+                        alert("✅ Backup Restored Successfully!");
+                        fetchTests();
+                    }
+                } catch(err) { alert("Invalid backup file"); }
+            };
+            reader.readAsText(file);
+        }
+
+        function exportToExcel() {
+            let csv = "Test Name,Department,Patient Rate,Partner Lab Rate,Outsource Lab Cost,Parameters\n";
+            if(fullDatabase.tests) {
+                fullDatabase.tests.forEach(t => {
+                    let params = t.parameters ? t.parameters.map(p => `${p.name} (${p.unit || '-'} | ${p.range || '-'})`).join(' / ') : '';
+                    csv += `"${t.name}","${t.department || ''}",${t.patient_rate || 0},${t.partner_lab_rate ?? t.patient_rate ?? 0},${t.lab_cost || 0},"${params}"\n`;
+                });
+            }
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "SL_Tests_List.csv";
+            a.click();
+        }
+
+        function importExcel(e) {
+            alert("Full Excel import (Drag & Drop) feature is coming in the next update!\nFor now, please use the Backup/Restore feature for bulk data.");
+            e.target.value = ""; 
+        }
+
+        window.onload = fetchTests;
+    </script>
+</body>
+</html>
