@@ -134,6 +134,48 @@
             page-break-inside: avoid;
         }
 
+        .report-sign-footer-block {
+            margin-top: 26px;
+            padding-top: 10px;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+        .sign-row-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 24px;
+            font-size: 11px;
+            color: #111827;
+        }
+        .sign-cell-left {
+            width: 50%;
+            text-align: left;
+            vertical-align: bottom;
+            padding-right: 12px;
+        }
+        .sign-cell-right {
+            width: 50%;
+            text-align: right;
+            vertical-align: bottom;
+            padding-left: 12px;
+        }
+        .sign-line-box {
+            display: inline-block;
+            min-width: 190px;
+            border-top: 1px solid #111827;
+            padding-top: 5px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+        .end-of-report-center {
+            text-align: center;
+            padding-top: 18px;
+            padding-bottom: 8px;
+            font-weight: bold;
+            font-size: 12px;
+            color: #333;
+        }
+
         #printableReportArea { display: none; }
         @page { size: A4 portrait; margin: 0mm !important; } 
         
@@ -603,6 +645,24 @@
             return html;
         }
 
+        function buildEndSignFooterHtml() {
+            return `
+                <div class="report-sign-footer-block">
+                    <table class="sign-row-table">
+                        <tr>
+                            <td class="sign-cell-left">
+                                <span class="sign-line-box">LABORATORY INCHARGE SIGNATURE</span>
+                            </td>
+                            <td class="sign-cell-right">
+                                <span class="sign-line-box">Dr. Signature</span>
+                            </td>
+                        </tr>
+                    </table>
+                    <div class="end-of-report-center">*** End of Report ***</div>
+                </div>
+            `;
+        }
+
         function setupPrintView() {
             let p = fullDatabase.patients[printingPtIndex];
             let lhIdx = document.getElementById('cfgLetterhead').value;
@@ -764,7 +824,7 @@
                     }
                     
                     if (index === totalTests - 1) {
-                        finalHtml += `<div style="text-align: center; padding-top: 20px; padding-bottom: 10px; font-weight: bold; font-size: 12px; color: #333; break-inside: avoid; page-break-inside: avoid;">*** End of Report ***</div>`;
+                        finalHtml += buildEndSignFooterHtml();
                     }
                 });
             }
@@ -862,7 +922,6 @@
             const botPadPx = Math.round(bMargin * MM_TO_PX);
             const usableHeightPx = Math.max(350, PAGE_H_PX - topPadPx - botPadPx);
 
-            // Build a hidden offscreen measurement container for individual content blocks
             let measureContainer = document.createElement('div');
             measureContainer.style.position = 'absolute';
             measureContainer.style.left = '-9999px';
@@ -881,7 +940,6 @@
                 clonedTextHeader.style.display = showTextHeader ? 'flex' : 'none';
             }
 
-            // Collect atomic blocks (header, patient info, tables, clinical note lines, end marker)
             let blocks = [];
             const headerEl = contentNode.querySelector('#prTextHeader');
             if (headerEl && headerEl.style.display !== 'none') blocks.push(headerEl.cloneNode(true));
@@ -893,14 +951,6 @@
             if (dynArea) {
                 Array.from(dynArea.children).forEach(child => {
                     if (child.classList && child.classList.contains('clinical-note-box')) {
-                        // Flatten nested lines inside clinical-note-box so long comments split cleanly across pages
-                        let noteHeaderBox = document.createElement('div');
-                        noteHeaderBox.style.borderTop = '1px solid #CBD5E1';
-                        noteHeaderBox.style.paddingTop = '6px';
-                        noteHeaderBox.style.fontSize = '11px';
-                        noteHeaderBox.style.lineHeight = '1.45';
-                        noteHeaderBox.style.color = '#1E293B';
-
                         let lines = child.querySelectorAll('.clinical-note-line');
                         if (lines.length > 0) {
                             lines.forEach((lineEl, lIdx) => {
@@ -977,7 +1027,6 @@
                 measureContainer.appendChild(probe);
                 let blkHeight = probe.getBoundingClientRect().height || probe.offsetHeight || 20;
 
-                // If adding this block exceeds usableHeightPx and current page already has content, start a fresh A4 page
                 if (currentUsedHeight > 0 && (currentUsedHeight + blkHeight) > usableHeightPx) {
                     pages.push(current.pageEl);
                     current = createPageElement();
@@ -989,7 +1038,6 @@
             }
             pages.push(current.pageEl);
 
-            // Remove last page's trailing break so no extra blank page is generated
             if (pages.length > 0) {
                 pages[pages.length - 1].style.pageBreakAfter = 'auto';
                 pages[pages.length - 1].style.breakAfter = 'auto';
