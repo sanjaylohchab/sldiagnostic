@@ -703,13 +703,7 @@ function setupPortalPrintView(ptIndex) {
             let dbTest = (fullDatabase.tests || []).find(t => t && t.name && t.name.replace(/\*/g, '').trim().toUpperCase() === cleanTName.toUpperCase());
             let params = dbTest && dbTest.parameters ? dbTest.parameters : [{name: cleanTName, unit: "-", range: "-"}];
             
-            let isExclusive = tName.includes('*') || (dbTest && dbTest.name && dbTest.name.includes('*'));
             let tableStyle = 'width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 12px;';
-            
-            if (isExclusive) {
-                if (index !== 0) tableStyle += ' page-break-before: always; break-before: page;';
-                tableStyle += ' page-break-after: always; break-after: page;';
-            }
 
             resultHtml += `<table style="${tableStyle}">`;
             resultHtml += `<thead><tr><th width="40%" style="border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 6px 8px; text-align: left; background-color: #f9f9f9 !important; font-size: 13px;">Test Name</th><th width="20%" style="border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 6px 8px; text-align: left; background-color: #f9f9f9 !important; font-size: 13px;">Result</th><th width="15%" style="border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 6px 8px; text-align: left; background-color: #f9f9f9 !important; font-size: 13px;">Unit</th><th width="25%" style="border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 6px 8px; text-align: left; background-color: #f9f9f9 !important; font-size: 13px;">Ref Range</th></tr></thead><tbody>`;
@@ -801,7 +795,7 @@ function waitForPortalImg(imgEl) {
     });
 }
 
-// 🔥 STRICT A4 PAGE COMPOSITOR (Protects header & footer on Page 2, 3, 4+ using exact top & bottom margins)
+// 🔥 BLANK-PAGE-FREE MULTI-PAGE LETTERHEAD PDF GENERATOR (No forced pageBreakAfter on fixed-height pages)
 async function generatePatientPDF(ptIndex) {
     if(typeof html2pdf === 'undefined') { alert("PDF Engine loading. Please wait..."); return; }
     await ensureReportsDataLoaded();
@@ -844,7 +838,6 @@ async function generatePatientPDF(ptIndex) {
     tempHolder.innerHTML = reportData.html;
     let innerContent = tempHolder.querySelector('#portalReportInnerContent') || tempHolder;
 
-    // Collect top-level atomic sections without breaking nested tables
     let blocks = [];
     Array.from(innerContent.children).forEach(child => {
         if (child.classList && child.classList.contains('portal-clinical-note')) {
@@ -880,8 +873,6 @@ async function generatePatientPDF(ptIndex) {
         pageEl.style.color = '#000000';
         pageEl.style.boxSizing = 'border-box';
         pageEl.style.overflow = 'hidden';
-        pageEl.style.pageBreakAfter = 'always';
-        pageEl.style.breakAfter = 'page';
 
         if (reportData.lhImgSrc) {
             let bgImg = document.createElement('img');
@@ -943,11 +934,6 @@ async function generatePatientPDF(ptIndex) {
         pages.push(current.pageEl);
     }
 
-    if (pages.length > 0) {
-        pages[pages.length - 1].style.pageBreakAfter = 'auto';
-        pages[pages.length - 1].style.breakAfter = 'auto';
-    }
-
     document.body.removeChild(measureContainer);
 
     let pdfWrapper = document.createElement('div');
@@ -976,8 +962,7 @@ async function generatePatientPDF(ptIndex) {
         filename:     reportData.pName + '_Lab_Report.pdf',
         image:        { type: 'jpeg', quality: onSmallScreen ? 0.85 : 1 },
         html2canvas:  { scale: onSmallScreen ? 1.25 : 2, useCORS: true, allowTaint: true, scrollY: 0, windowWidth: PAGE_W_PX, logging: false },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak:    { mode: ['css', 'legacy'] }
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
     try {
