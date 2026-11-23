@@ -591,6 +591,16 @@ function checkoutWhatsApp() {
 /* --- PATIENT REPORT FINDER --- */
 function safeKey(key) { return key ? String(key).replace(/[.#$\[\]\/]/g, '_') : "unknown"; }
 
+function isSavedIncludeNote(p, sTName, legacySTName) {
+    if (p && p.test_results && p.test_results[sTName] && p.test_results[sTName]._include_note !== undefined) {
+        return !!p.test_results[sTName]._include_note;
+    }
+    if (p && p.test_results && legacySTName && p.test_results[legacySTName] && p.test_results[legacySTName]._include_note !== undefined) {
+        return !!p.test_results[legacySTName]._include_note;
+    }
+    return false;
+}
+
 function formatPortalClinicalNote(text) {
     if (!text) return '';
     let lines = text.split('\n');
@@ -702,6 +712,8 @@ function setupPortalPrintView(ptIndex) {
             let cleanTName = tName.replace(/\*/g, '').trim();
             let dbTest = (fullDatabase.tests || []).find(t => t && t.name && t.name.replace(/\*/g, '').trim().toUpperCase() === cleanTName.toUpperCase());
             let params = dbTest && dbTest.parameters ? dbTest.parameters : [{name: cleanTName, unit: "-", range: "-"}];
+            let sTName = safeKey(cleanTName);
+            let oldSTName = safeKey(tName);
             
             let tableStyle = 'width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 12px;';
 
@@ -715,9 +727,9 @@ function setupPortalPrintView(ptIndex) {
                 let impressionText = "";
                 
                 params.forEach(param => {
-                    let sTName = safeKey(cleanTName); let sPName = safeKey(param.name);
+                    let sPName = safeKey(param.name);
                     let existing = (p.test_results && p.test_results[sTName]) ? p.test_results[sTName][sPName] : undefined;
-                    if (existing === undefined) { existing = (p.test_results && p.test_results[safeKey(tName)]) ? p.test_results[safeKey(tName)][sPName] : undefined; }
+                    if (existing === undefined) { existing = (p.test_results && p.test_results[oldSTName]) ? p.test_results[oldSTName][sPName] : undefined; }
                     let val = (existing && typeof existing === 'object') ? existing.v : (existing || '');
                     
                     if (param.name.toUpperCase().includes('IMPRESSION') || param.name.toUpperCase().includes('REMARK')) { impressionText = val; } 
@@ -739,9 +751,9 @@ function setupPortalPrintView(ptIndex) {
                         return;
                     }
 
-                    let sTName = safeKey(cleanTName); let sPName = safeKey(param.name);
+                    let sPName = safeKey(param.name);
                     let existing = (p.test_results && p.test_results[sTName]) ? p.test_results[sTName][sPName] : undefined;
-                    if (existing === undefined) { existing = (p.test_results && p.test_results[safeKey(tName)]) ? p.test_results[safeKey(tName)][sPName] : undefined; }
+                    if (existing === undefined) { existing = (p.test_results && p.test_results[oldSTName]) ? p.test_results[oldSTName][sPName] : undefined; }
                     let val = '', unit = param.unit || '', range = param.range || '', isAb = false, isPrint = true;
                     
                     if (existing !== undefined && existing !== null) {
@@ -757,7 +769,8 @@ function setupPortalPrintView(ptIndex) {
 
             resultHtml += `</tbody></table>`;
 
-            if (dbTest && dbTest.clinical_note && dbTest.clinical_note.trim() !== '') {
+            let includeNote = isSavedIncludeNote(p, sTName, oldSTName);
+            if (includeNote && dbTest && dbTest.clinical_note && dbTest.clinical_note.trim() !== '') {
                 resultHtml += `<div class="portal-clinical-note">${formatPortalClinicalNote(dbTest.clinical_note)}</div>`;
             }
             
@@ -795,7 +808,6 @@ function waitForPortalImg(imgEl) {
     });
 }
 
-// 🔥 BLANK-PAGE-FREE MULTI-PAGE LETTERHEAD PDF GENERATOR (No forced pageBreakAfter on fixed-height pages)
 async function generatePatientPDF(ptIndex) {
     if(typeof html2pdf === 'undefined') { alert("PDF Engine loading. Please wait..."); return; }
     await ensureReportsDataLoaded();
