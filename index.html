@@ -38,8 +38,8 @@
         .quick-icon { display:grid; place-items:center; width:46px; height:46px; flex:0 0 auto; margin-right:13px; border-radius:13px; color:var(--icon-color); background:var(--icon-bg); font-size:21px; }
         .quick-card h4 { margin:2px 0 3px; font-size:13px; } .quick-card p { margin:0; color:var(--muted); font-size:10px; line-height:1.5; }
         .quick-arrow { position:absolute; right:15px; bottom:12px; color:var(--icon-color); font-weight:700; }
-        .patient { --icon-bg:#e8efff; --icon-color:#315ee8; } .billing { --icon-bg:#e3f8ef; --icon-color:#159a63; } .reports { --icon-bg:#fff0d9; --icon-color:#d57b00; } .tests { --icon-bg:#f3e9ff; --icon-color:#8c3fd0; } .settings { --icon-bg:#e7f5ff; --icon-color:#1685bc; } .admin { --icon-bg:#ffeaee; --icon-color:#d13c53; }
-        body.dark .patient { --icon-bg:#19335b; } body.dark .billing { --icon-bg:#153e36; } body.dark .reports { --icon-bg:#463511; } body.dark .tests { --icon-bg:#36204f; } body.dark .settings { --icon-bg:#12384c; } body.dark .admin { --icon-bg:#482130; }
+        .patient { --icon-bg:#e8efff; --icon-color:#315ee8; } .billing { --icon-bg:#e3f8ef; --icon-color:#159a63; } .reports { --icon-bg:#fff0d9; --icon-color:#d57b00; } .tests { --icon-bg:#f3e9ff; --icon-color:#8c3fd0; } .portal { --icon-bg:#e0f7fa; --icon-color:#00838f; } .settings { --icon-bg:#e7f5ff; --icon-color:#1685bc; } .admin { --icon-bg:#ffeaee; --icon-color:#d13c53; }
+        body.dark .patient { --icon-bg:#19335b; } body.dark .billing { --icon-bg:#153e36; } body.dark .reports { --icon-bg:#463511; } body.dark .tests { --icon-bg:#36204f; } body.dark .portal { --icon-bg:#0f3842; } body.dark .settings { --icon-bg:#12384c; } body.dark .admin { --icon-bg:#482130; }
         .footer { margin:27px 0 6px; color:var(--muted); text-align:center; font-size:10px; }
         @media (max-width:850px) { .quick-grid { grid-template-columns:repeat(2,1fr); } }
         @media (max-width:520px) { .topbar { padding:16px 20px 105px; } .main { width:min(100% - 28px,1180px); margin-top:-68px; } .brand-mark { width:36px; height:36px; border-radius:11px; } .brand small { display:none; } .logout { width:38px; padding:0; font-size:0; } .logout::after { content:'↪'; font-size:18px; } .welcome { margin-top:25px; } .module-panel { padding:15px; border-radius:15px; } .quick-grid { gap:10px; } .quick-card { display:block; min-height:118px; padding:13px; border-radius:15px; } .quick-icon { width:38px; height:38px; margin:0 0 9px; font-size:18px; } .quick-card h4 { font-size:12px; } .quick-card p { font-size:9px; } }
@@ -72,6 +72,7 @@
                 <a href="billing.html" class="quick-card billing"><div class="quick-icon">💳</div><div><h4>Billing</h4><p>Prepare invoices and cash receipts.</p></div><span class="quick-arrow">→</span></a>
                 <a href="reports.html" class="quick-card reports"><div class="quick-icon">🔬</div><div><h4>Test Reports</h4><p>Enter results, print or download PDF.</p></div><span class="quick-arrow">→</span></a>
                 <a href="test_master.html" class="quick-card tests"><div class="quick-icon">🧪</div><div><h4>Test Master</h4><p>Manage tests, rates and parameters.</p></div><span class="quick-arrow">→</span></a>
+                <a href="patient_portal.html" class="quick-card portal"><div class="quick-icon">🏥</div><div><h4>Patient Portal</h4><p>View partner lab and patient portal.</p></div><span class="quick-arrow">→</span></a>
                 <a href="settings.html" class="quick-card settings" id="cardSettings"><div class="quick-icon">⚙️</div><div><h4>App Settings</h4><p>Lab profile, letterhead and signature.</p></div><span class="quick-arrow">→</span></a>
                 <a href="admin.html" class="quick-card admin" id="cardAdmin" hidden><div class="quick-icon">🛡️</div><div><h4>Admin Panel</h4><p>Manage staff and review activity logs.</p></div><span class="quick-arrow">→</span></a>
             </div>
@@ -80,7 +81,7 @@
     </main>
 
     <script>
-        const dbUrl = 'https://diagnostic-center-74aa4-default-rtdb.firebaseio.com/lab_data.json';
+        const baseDbUrl = 'https://diagnostic-center-74aa4-default-rtdb.firebaseio.com/lab_data';
         document.getElementById('displayUserName').textContent = activeUser.name || activeUser.username || 'User';
         document.getElementById('displayUserRole').textContent = activeUser.role || 'Staff';
         const hour = new Date().getHours();
@@ -88,19 +89,46 @@
         if (activeUser.role === 'Super Admin') document.getElementById('cardAdmin').hidden = false;
         else document.getElementById('cardSettings').style.display = 'none';
 
-        async function loadLabSettings() {
-            try { const response = await fetch(dbUrl, { cache:'no-store' }); const data = await response.json(); if (data && data.lab_name) document.getElementById('labNameHeadline').textContent = data.lab_name.toUpperCase(); }
-            catch (error) { console.log('Lab name could not be loaded.'); }
+        const cachedLabName = localStorage.getItem('sl_lab_name');
+        if (cachedLabName) {
+            document.getElementById('labNameHeadline').textContent = cachedLabName.toUpperCase();
         }
-        async function verifyActiveSession() {
-            try { const response = await fetch(dbUrl, {cache:'no-store'}); const data = await response.json() || {}; const account = data.users && data.users[activeUser.username]; if (!account || account.active === false) { localStorage.removeItem('sl_active_user'); alert('This staff account is inactive. Please contact Super Admin.'); window.location.replace('login.html'); } } catch (error) { console.log('Session verification unavailable.'); }
+
+        function safeKey(key) {
+            if (!key) return "unknown";
+            return String(key).replace(/[.#$\[\]\/]/g, '_');
         }
+
+        async function loadLabSettingsFast() {
+            try {
+                const response = await fetch(`${baseDbUrl}/lab_name.json?nocache=${Date.now()}`, { cache: 'no-store' });
+                const labName = await response.json();
+                if (labName && typeof labName === 'string') {
+                    localStorage.setItem('sl_lab_name', labName);
+                    document.getElementById('labNameHeadline').textContent = labName.toUpperCase();
+                }
+            } catch (error) { console.log('Lab name could not be loaded.'); }
+        }
+
+        async function verifyActiveSessionFast() {
+            try {
+                const userKey = safeKey(activeUser.username);
+                const response = await fetch(`${baseDbUrl}/users/${userKey}.json?nocache=${Date.now()}`, { cache: 'no-store' });
+                const account = await response.json();
+                if (!account || account.active === false) {
+                    localStorage.removeItem('sl_active_user');
+                    alert('This staff account is inactive. Please contact Super Admin.');
+                    window.location.replace('login.html');
+                }
+            } catch (error) { console.log('Session verification unavailable.'); }
+        }
+
         function logout() { localStorage.removeItem('sl_active_user'); window.location.replace('login.html'); }
         function toggleDarkMode() { document.body.classList.toggle('dark'); localStorage.setItem('darkMode', document.body.classList.contains('dark')); document.getElementById('themeToggle').textContent = document.body.classList.contains('dark') ? '☀' : '☾'; }
         if (localStorage.getItem('darkMode') === 'true') document.body.classList.add('dark');
         document.getElementById('themeToggle').textContent = document.body.classList.contains('dark') ? '☀' : '☾';
-        loadLabSettings();
-        verifyActiveSession();
+        loadLabSettingsFast();
+        verifyActiveSessionFast();
     </script>
 </body>
 </html>
