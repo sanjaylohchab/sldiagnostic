@@ -211,6 +211,32 @@
         -webkit-print-color-adjust: exact !important; 
         print-color-adjust: exact !important; 
     }
+    .portal-clinical-note {
+        padding: 8px;
+        margin-bottom: 14px;
+        border-top: 1px solid #CBD5E1;
+        font-size: 11px;
+        line-height: 1.45;
+        color: #1E293B;
+    }
+    .portal-sign-block {
+        margin-top: 22px;
+        padding-top: 8px;
+    }
+    .portal-sign-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+        font-size: 11px;
+        color: #111827;
+    }
+    .portal-sign-line {
+        display: inline-block;
+        min-width: 185px;
+        border-top: 1px solid #111827;
+        padding-top: 5px;
+        font-weight: 700;
+    }
 </style>
 </head>
 <body>
@@ -370,51 +396,7 @@
 </div>
 
 <!-- NATIVE PRINT ENGINE TARGET AREA -->
-<div id="printableReportArea">
-    <img id="prLetterheadImg" class="letterhead-bg" style="display:none;">
-    <table style="width: 100%; border: none; border-collapse: collapse;">
-        <thead style="border: none;">
-            <tr><td id="topSpaceCell" style="border: none; padding: 0;"></td></tr>
-        </thead>
-        <tbody style="border: none;">
-            <tr>
-                <td style="border: none; padding: 0;">
-                    <div id="printContentWrapper">
-                        <div class="fallback-header" id="prTextHeader">
-                            <div><h1 id="prLabName">SL DIAGNOSTIC CENTER</h1></div>
-                        </div>
-                        <table class="rep-info-table">
-                            <tr>
-                                <td width="50%" class="box-cell">
-                                    <table class="inner-info">
-                                        <tr><td class="inner-lbl">Patient Name</td><td class="inner-colon">:</td><td><b id="prName" style="font-size: 15px;">-</b></td></tr>
-                                        <tr><td class="inner-lbl">Age / Sex</td><td class="inner-colon">:</td><td id="prAgeSex">-</td></tr>
-                                        <tr><td class="inner-lbl">Referred By</td><td class="inner-colon">:</td><td id="prDoc">-</td></tr>
-                                    </table>
-                                </td>
-                                <td width="50%" class="box-cell">
-                                    <table class="inner-info">
-                                        <tr><td class="inner-lbl" style="width: 130px;">Report Lab ID</td><td class="inner-colon">:</td><td><b id="prLabNo">-</b></td></tr>
-                                        <tr><td class="inner-lbl">Sample Date</td><td class="inner-colon">:</td><td id="prSampleDate">-</td></tr>
-                                        <tr><td class="inner-lbl">Report Date</td><td class="inner-colon">:</td><td id="prReportDate">-</td></tr>
-                                    </table>
-                                </td>
-                            </tr>
-                        </table>
-                        <table class="rep-main-table">
-                            <thead><tr><th width="40%">Test Name</th><th width="20%">Result</th><th width="15%">Unit</th><th width="25%">Ref Range</th></tr></thead>
-                            <tbody id="prTestRows"></tbody>
-                        </table>
-                        <div style="text-align: center; margin-top: 50px; font-weight: bold; font-size: 12px; color: #333;">*** End of Report ***</div>
-                    </div>
-                </td>
-            </tr>
-        </tbody>
-        <tfoot style="border: none;">
-            <tr><td id="bottomSpaceCell" style="border: none; padding: 0;"></td></tr>
-        </tfoot>
-    </table>
-</div>
+<div id="printableReportArea"></div>
 
 <script>
 const baseDbUrl = "https://diagnostic-center-74aa4-default-rtdb.firebaseio.com/lab_data";
@@ -484,7 +466,6 @@ async function fetchJsonSafe(url) {
     return await res.json();
 }
 
-// 🔥 FAST PORTAL LOAD: Fetches lightweight nodes first so portal opens quickly
 async function loadData(){
     document.getElementById('loadingBar').style.display = 'block';
     const cachedName = localStorage.getItem('sl_lab_name');
@@ -525,7 +506,6 @@ async function loadData(){
     finally{ document.getElementById('loadingBar').style.display = 'none'; }
 }
 
-// Fetch patients & letterheads only when finding/printing/downloading reports
 async function ensureReportsDataLoaded() {
     if (Array.isArray(fullDatabase.patients) && fullDatabase.patients.length > 0 && fullDatabase.letterheads) {
         return;
@@ -605,6 +585,37 @@ function checkoutWhatsApp() {
 /* --- PATIENT REPORT FINDER --- */
 function safeKey(key) { return key ? String(key).replace(/[.#$\[\]\/]/g, '_') : "unknown"; }
 
+function formatPortalClinicalNote(text) {
+    if (!text) return '';
+    let lines = text.split('\n');
+    let html = '';
+    let inTable = false;
+
+    lines.forEach(line => {
+        let trimmed = line.trim();
+        if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+            let cells = trimmed.slice(1, -1).split('|').map(c => c.trim());
+            if (!inTable) {
+                inTable = true;
+                html += `<table style="width:100%; max-width:520px; border-collapse:collapse; margin:6px 0 8px 0; font-size:11px; border:1px solid #000;">`;
+                html += `<tr style="background:#F1F5F9; font-weight:bold;">` + cells.map(c => `<td style="border:1px solid #000; padding:4px 6px;">${c}</td>`).join('') + `</tr>`;
+            } else {
+                html += `<tr>` + cells.map(c => `<td style="border:1px solid #000; padding:4px 6px;">${c}</td>`).join('') + `</tr>`;
+            }
+        } else {
+            if (inTable) { html += `</table>`; inTable = false; }
+            if (trimmed === '') {
+                html += `<div style="height:6px;"></div>`;
+            } else {
+                let formatted = trimmed.replace(/^(Reference Range|Clinical Significance|Method|Note|Interpretation|Remark)(:?)/i, '<b>$1$2</b>');
+                html += `<div style="margin-bottom:2px; text-align:justify;">${formatted}</div>`;
+            }
+        }
+    });
+    if (inTable) html += `</table>`;
+    return html;
+}
+
 async function findMyReports() {
     let phone = document.getElementById('patientPhone').value.trim();
     let resArea = document.getElementById('reportResults');
@@ -642,7 +653,6 @@ async function findMyReports() {
     });
 }
 
-// 🔥 UNIFIED PORTAL REPORT ENGINE
 function setupPortalPrintView(ptIndex) {
     let p = fullDatabase.patients[ptIndex];
     let lhImgSrc = fullDatabase.letterhead_image || (fullDatabase.letterheads && fullDatabase.letterheads.length > 0 ? fullDatabase.letterheads[0].img : null);
@@ -684,11 +694,11 @@ function setupPortalPrintView(ptIndex) {
         
         p.selected_tests.forEach((tName, index) => {
             let cleanTName = tName.replace(/\*/g, '').trim();
-            let dbTest = fullDatabase.tests.find(t => t.name.replace(/\*/g, '').trim().toUpperCase() === cleanTName.toUpperCase());
+            let dbTest = (fullDatabase.tests || []).find(t => t && t.name && t.name.replace(/\*/g, '').trim().toUpperCase() === cleanTName.toUpperCase());
             let params = dbTest && dbTest.parameters ? dbTest.parameters : [{name: cleanTName, unit: "-", range: "-"}];
             
-            let isExclusive = tName.includes('*') || (dbTest && dbTest.name.includes('*'));
-            let tableStyle = 'width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; page-break-inside: avoid;';
+            let isExclusive = tName.includes('*') || (dbTest && dbTest.name && dbTest.name.includes('*'));
+            let tableStyle = 'width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 12px;';
             
             if (isExclusive) {
                 if (index !== 0) tableStyle += ' page-break-before: always; break-before: page;';
@@ -744,11 +754,30 @@ function setupPortalPrintView(ptIndex) {
                     resultHtml += `<tr><td style="padding: 5px 8px; line-height: 1.4; font-weight:500;">${param.name}</td><td style="padding: 5px 8px; line-height: 1.4;">${displayRes}</td><td style="padding: 5px 8px; line-height: 1.4;">${unit}</td><td style="padding: 5px 8px; line-height: 1.4;">${range}</td></tr>`;
                 });
             }
+
+            resultHtml += `</tbody></table>`;
+
+            if (dbTest && dbTest.clinical_note && dbTest.clinical_note.trim() !== '') {
+                resultHtml += `<div class="portal-clinical-note">${formatPortalClinicalNote(dbTest.clinical_note)}</div>`;
+            }
             
             if (index === totalTests - 1) {
-                resultHtml += `<tr><td colspan="4" style="text-align: center; padding-top: 30px; padding-bottom: 10px; font-weight: bold; font-size: 12px; color: #333; border: none;">*** End of Report ***</td></tr>`;
+                resultHtml += `
+                    <div class="portal-sign-block">
+                        <table class="portal-sign-table">
+                            <tr>
+                                <td style="width:50%; text-align:left; vertical-align:bottom;">
+                                    <span class="portal-sign-line">LABORATORY INCHARGE SIGNATURE</span>
+                                </td>
+                                <td style="width:50%; text-align:right; vertical-align:bottom;">
+                                    <span class="portal-sign-line">Dr. Signature</span>
+                                </td>
+                            </tr>
+                        </table>
+                        <div style="text-align: center; padding-top: 20px; padding-bottom: 10px; font-weight: bold; font-size: 12px; color: #333;">*** End of Report ***</div>
+                    </div>
+                `;
             }
-            resultHtml += `</tbody></table>`;
         });
     }
 
@@ -756,58 +785,100 @@ function setupPortalPrintView(ptIndex) {
     return { html: resultHtml, lhImgSrc: lhImgSrc, pName: (p.name ? p.name.toUpperCase() : "Report"), pObj: p };
 }
 
-function generatePatientPDF(ptIndex) {
+function waitForPortalImg(imgEl) {
+    return new Promise(resolve => {
+        if (!imgEl || !imgEl.src) return resolve();
+        if (imgEl.complete && imgEl.naturalWidth > 0) return resolve();
+        imgEl.onload = () => resolve();
+        imgEl.onerror = () => resolve();
+        setTimeout(resolve, 4000);
+    });
+}
+
+// 📥 MOBILE-SAFE PORTAL PDF ENGINE (Includes clinical notes & avoids html2canvas scale crash)
+async function generatePatientPDF(ptIndex) {
     if(typeof html2pdf === 'undefined') { alert("PDF Engine loading. Please wait..."); return; }
+    await ensureReportsDataLoaded();
     
     let reportData = setupPortalPrintView(ptIndex);
     if(typeof trackViewer === 'function') trackViewer('report_download', {patient_name:reportData.pObj.name||'', phone:reportData.pObj.phone||'', lab_no:reportData.pObj.lab_no||''});
 
     let overlay = document.createElement('div');
-    overlay.style.position = 'absolute'; overlay.style.top = '0'; overlay.style.left = '0';
-    overlay.style.width = '100%'; overlay.style.minHeight = '100vh';
-    overlay.style.backgroundColor = '#ffffff'; overlay.style.zIndex = '999999';
-    overlay.innerHTML = '<div style="text-align:center; padding:20px; font-weight:bold; color:#3B82F6;">⏳ Generating PDF... Please wait 2 seconds.</div>';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.overflow = 'auto';
+    overlay.style.backgroundColor = '#F1F5F9';
+    overlay.style.zIndex = '999999';
+    overlay.style.padding = '16px 10px';
+    overlay.style.boxSizing = 'border-box';
+    overlay.innerHTML = '<div style="text-align:center; padding:12px; font-weight:bold; color:#2563EB; font-size:15px;">⏳ Generating PDF... Please wait 10-15 seconds.</div>';
     
     let pdfWrapper = document.createElement('div');
-    pdfWrapper.style.width = '794px'; pdfWrapper.style.minHeight = '1123px';
-    pdfWrapper.style.margin = '0 auto'; pdfWrapper.style.backgroundColor = '#ffffff'; pdfWrapper.style.color = '#000000';
-    
+    pdfWrapper.style.width = '794px';
+    pdfWrapper.style.minHeight = '1123px';
+    pdfWrapper.style.margin = '0 auto';
+    pdfWrapper.style.backgroundColor = '#ffffff';
+    pdfWrapper.style.color = '#000000';
+    pdfWrapper.style.position = 'relative';
+    pdfWrapper.style.overflow = 'hidden';
+
+    let bgImgEl = null;
     if (reportData.lhImgSrc) {
-        pdfWrapper.style.backgroundImage = `url(${reportData.lhImgSrc})`;
-        pdfWrapper.style.backgroundSize = '794px 1123px';
-        pdfWrapper.style.backgroundRepeat = 'repeat-y';
-        pdfWrapper.style.backgroundPosition = 'top left';
+        bgImgEl = document.createElement('img');
+        bgImgEl.src = reportData.lhImgSrc;
+        bgImgEl.style.position = 'absolute';
+        bgImgEl.style.top = '0';
+        bgImgEl.style.left = '0';
+        bgImgEl.style.width = '794px';
+        bgImgEl.style.height = '1123px';
+        bgImgEl.style.objectFit = 'cover';
+        bgImgEl.style.zIndex = '0';
+        bgImgEl.style.pointerEvents = 'none';
+        pdfWrapper.appendChild(bgImgEl);
     }
 
-    pdfWrapper.innerHTML = reportData.html;
+    let fgBox = document.createElement('div');
+    fgBox.style.position = 'relative';
+    fgBox.style.zIndex = '1';
+    fgBox.innerHTML = reportData.html;
+    pdfWrapper.appendChild(fgBox);
+
     overlay.appendChild(pdfWrapper);
     document.body.appendChild(overlay);
     window.scrollTo(0, 0);
-    
     document.getElementById('loadingBar').style.display = 'block';
 
+    if (bgImgEl) {
+        await waitForPortalImg(bgImgEl);
+    }
+
+    const onSmallScreen = window.innerWidth <= 768;
     let opt = {
         margin:       0,
         filename:     reportData.pName + '_Lab_Report.pdf',
-        image:        { type: 'jpeg', quality: 1 },
-        html2canvas:  { scale: 2, useCORS: true, scrollY: 0, windowWidth: 794 },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        image:        { type: 'jpeg', quality: onSmallScreen ? 0.85 : 1 },
+        html2canvas:  { scale: onSmallScreen ? 1.25 : 2, useCORS: true, allowTaint: true, scrollY: 0, windowWidth: 794, logging: false },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak:    { mode: ['css', 'legacy'] }
     };
 
-    setTimeout(() => {
-        html2pdf().set(opt).from(pdfWrapper).save().then(() => {
-            document.body.removeChild(overlay); 
-            document.getElementById('loadingBar').style.display = 'none';
-        }).catch(err => {
-            console.error(err);
-            document.body.removeChild(overlay);
-            document.getElementById('loadingBar').style.display = 'none';
-            alert("Error generating PDF.");
-        });
-    }, 1500); 
+    try {
+        await html2pdf().set(opt).from(pdfWrapper).save();
+        if (document.body.contains(overlay)) document.body.removeChild(overlay);
+        document.getElementById('loadingBar').style.display = 'none';
+    } catch (err) {
+        console.error(err);
+        if (document.body.contains(overlay)) document.body.removeChild(overlay);
+        document.getElementById('loadingBar').style.display = 'none';
+        alert("Error generating PDF.");
+    }
 }
 
-function printPatientReport(ptIndex) {
+async function printPatientReport(ptIndex) {
+    await ensureReportsDataLoaded();
     let reportData = setupPortalPrintView(ptIndex);
     if(typeof trackViewer === 'function') trackViewer('report_print', {patient_name:reportData.pObj.name||'', phone:reportData.pObj.phone||'', lab_no:reportData.pObj.lab_no||''});
     
@@ -967,7 +1038,6 @@ function renderPackages(){
 
 async function deletePackage(id){ if(confirm("Delete Package?")){ fullDatabase.packages = fullDatabase.packages.filter(p=>p.id!==id); await persist(); renderPackages(); } }
 
-// 🔥 ALWAYS SHOW TEST RATE LIST (Shows top tests immediately even before typing, filters all matches on search)
 function renderTests(){
     let q = (document.getElementById('testSearch').value || '').trim().toUpperCase();
     let grid = document.getElementById('testGrid'); 
