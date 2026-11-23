@@ -788,23 +788,22 @@
             return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.innerWidth <= 768;
         }
 
-        function fallbackToPrintSaveAsPdf() {
-            alert("📱 फ़ोन में सीधा PDF जनरेट होने में समय लग रहा है—अब Print / Save as PDF खुलेगा, वहाँ से 'Save as PDF' चुन लें।");
-            setTimeout(() => { window.print(); }, 250);
+        function waitForImageReady(imgEl) {
+            return new Promise(resolve => {
+                if (!imgEl || !imgEl.src) return resolve();
+                if (imgEl.complete && imgEl.naturalWidth > 0) return resolve();
+                imgEl.onload = () => resolve();
+                imgEl.onerror = () => resolve();
+                setTimeout(resolve, 4000);
+            });
         }
 
-        // 🔥 MOBILE-SAFE PDF DOWNLOAD ENGINE (Keeps desktop flow intact, handles letterhead & plain report on phone)
-        function downloadMobilePDF() {
+        // 🔥 MOBILE & DESKTOP DIRECT PDF DOWNLOAD (No print fallback, waits for full report)
+        async function downloadMobilePDF() {
             let auditPatient = fullDatabase.patients && fullDatabase.patients[printingPtIndex];
             if (auditPatient) recordAudit(`Downloaded PDF report for ${auditPatient.name || 'patient'}`, 'report');
             if (typeof html2pdf === 'undefined') {
-                if (isMobileDevice()) {
-                    closeModal('printConfigOverlay');
-                    setupPrintView();
-                    fallbackToPrintSaveAsPdf();
-                } else {
-                    alert("⏳ PDF Library is still loading... Please wait 2 seconds and click again.");
-                }
+                alert("⏳ PDF Library is still loading... Please wait 2 seconds and click again.");
                 return;
             }
 
@@ -829,16 +828,17 @@
             overlay.style.overflow = 'auto';
             overlay.style.backgroundColor = '#F1F5F9';
             overlay.style.zIndex = '999999';
-            overlay.style.padding = '20px 10px';
+            overlay.style.padding = '16px 10px';
             overlay.style.boxSizing = 'border-box';
             
             let loadMsg = document.createElement('h2');
             loadMsg.style.textAlign = 'center';
             loadMsg.style.color = '#2563EB';
             loadMsg.style.fontFamily = 'sans-serif';
-            loadMsg.style.fontSize = '16px';
+            loadMsg.style.fontSize = '15px';
+            loadMsg.style.margin = '6px 0 12px 0';
             loadMsg.innerText = onPhone
-                ? '⏳ फ़ोन में PDF तैयार हो रही है... कृपया स्क्रीन खुली रखें।'
+                ? '⏳ फ़ोन में PDF तैयार हो रही है (10-15 सेकंड लग सकते हैं)... स्क्रीन खुली रखें।'
                 : '⏳ Generating Perfect PDF... Please wait.';
             overlay.appendChild(loadMsg);
 
@@ -846,20 +846,31 @@
             pdfWrapper.id = 'pdfGenWrapper';
             pdfWrapper.style.width = '794px';
             pdfWrapper.style.minHeight = '1123px';
-            pdfWrapper.style.margin = '12px auto';
+            pdfWrapper.style.margin = '0 auto';
             pdfWrapper.style.backgroundColor = '#ffffff';
             pdfWrapper.style.color = '#000000';
             pdfWrapper.style.position = 'relative';
-            
+            pdfWrapper.style.overflow = 'hidden';
+
+            let bgImgEl = null;
             if (showLh && lhImgSrc) {
-                pdfWrapper.style.backgroundImage = `url("${lhImgSrc}")`;
-                pdfWrapper.style.backgroundSize = '794px 1123px';
-                pdfWrapper.style.backgroundRepeat = 'repeat-y';
-                pdfWrapper.style.backgroundPosition = 'top left';
+                bgImgEl = document.createElement('img');
+                bgImgEl.src = lhImgSrc;
+                bgImgEl.style.position = 'absolute';
+                bgImgEl.style.top = '0';
+                bgImgEl.style.left = '0';
+                bgImgEl.style.width = '794px';
+                bgImgEl.style.height = '1123px';
+                bgImgEl.style.objectFit = 'cover';
+                bgImgEl.style.zIndex = '0';
+                bgImgEl.style.pointerEvents = 'none';
+                pdfWrapper.appendChild(bgImgEl);
             }
 
             let contentNode = document.getElementById('printContentWrapper').cloneNode(true);
             contentNode.style.display = 'block';
+            contentNode.style.position = 'relative';
+            contentNode.style.zIndex = '1';
             contentNode.style.paddingTop = tMargin + 'mm';
             contentNode.style.paddingBottom = bMargin + 'mm';
             contentNode.style.paddingLeft = '10mm';
@@ -875,41 +886,31 @@
             overlay.appendChild(pdfWrapper);
             document.body.appendChild(overlay);
 
+            overlay.scrollTop = 0;
             window.scrollTo(0, 0);
+
+            if (bgImgEl) {
+                await waitForImageReady(bgImgEl);
+            }
 
             let opt = {
                 margin:       0,
                 filename:     pName + '_Lab_Report.pdf',
-                image:        { type: 'jpeg', quality: onPhone ? 0.85 : 1 },
-                html2canvas:  { scale: onPhone ? 1.35 : 2, useCORS: true, allowTaint: true, scrollY: 0, logging: false },
+                image:        { type: 'jpeg', quality: onPhone ? 0.8 : 1 },
+                html2canvas:  { scale: onPhone ? 1.2 : 2, useCORS: true, allowTaint: true, scrollY: 0, logging: false },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
                 pagebreak:    { mode: ['css', 'legacy'] }
             };
 
-            let fallbackTimer = null;
-            if (onPhone) {
-                fallbackTimer = setTimeout(() => {
-                    if (document.body.contains(overlay)) {
-                        document.body.removeChild(overlay);
-                        fallbackToPrintSaveAsPdf();
-                    }
-                }, 14000);
-            }
-
-            html2pdf().set(opt).from(pdfWrapper).save().then(() => {
-                if (fallbackTimer) clearTimeout(fallbackTimer);
+            try {
+                await html2pdf().set(opt).from(pdfWrapper).save();
                 if (document.body.contains(overlay)) document.body.removeChild(overlay);
                 alert("✅ PDF Downloaded Successfully!");
-            }).catch(err => {
-                if (fallbackTimer) clearTimeout(fallbackTimer);
+            } catch (err) {
                 console.error(err);
                 if (document.body.contains(overlay)) document.body.removeChild(overlay);
-                if (onPhone) {
-                    fallbackToPrintSaveAsPdf();
-                } else {
-                    alert("Error generating PDF.");
-                }
-            });
+                alert("❌ PDF बनाने में दिक्कत आई—कृपया एक बार फिर से Download Perfect PDF दबाएँ।");
+            }
         }
 
         window.onload = init;
