@@ -219,9 +219,15 @@
         line-height: 1.45;
         color: #1E293B;
     }
+    .portal-note-line {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
     .portal-sign-block {
         margin-top: 22px;
         padding-top: 8px;
+        break-inside: avoid;
+        page-break-inside: avoid;
     }
     .portal-sign-table {
         width: 100%;
@@ -598,17 +604,17 @@ function formatPortalClinicalNote(text) {
             if (!inTable) {
                 inTable = true;
                 html += `<table style="width:100%; max-width:520px; border-collapse:collapse; margin:6px 0 8px 0; font-size:11px; border:1px solid #000;">`;
-                html += `<tr style="background:#F1F5F9; font-weight:bold;">` + cells.map(c => `<td style="border:1px solid #000; padding:4px 6px;">${c}</td>`).join('') + `</tr>`;
+                html += `<tr class="portal-note-line" style="background:#F1F5F9; font-weight:bold;">` + cells.map(c => `<td style="border:1px solid #000; padding:4px 6px;">${c}</td>`).join('') + `</tr>`;
             } else {
-                html += `<tr>` + cells.map(c => `<td style="border:1px solid #000; padding:4px 6px;">${c}</td>`).join('') + `</tr>`;
+                html += `<tr class="portal-note-line">` + cells.map(c => `<td style="border:1px solid #000; padding:4px 6px;">${c}</td>`).join('') + `</tr>`;
             }
         } else {
             if (inTable) { html += `</table>`; inTable = false; }
             if (trimmed === '') {
-                html += `<div style="height:6px;"></div>`;
+                html += `<div class="portal-note-line" style="height:6px;"></div>`;
             } else {
                 let formatted = trimmed.replace(/^(Reference Range|Clinical Significance|Method|Note|Interpretation|Remark)(:?)/i, '<b>$1$2</b>');
-                html += `<div style="margin-bottom:2px; text-align:justify;">${formatted}</div>`;
+                html += `<div class="portal-note-line" style="margin-bottom:2px; text-align:justify;">${formatted}</div>`;
             }
         }
     });
@@ -663,7 +669,7 @@ function setupPortalPrintView(ptIndex) {
     }
 
     let resultHtml = `
-        <div style="padding-left: 38px; padding-right: 38px; padding-top: ${tMargin}mm; padding-bottom: ${bMargin}mm;">
+        <div id="portalReportInnerContent" style="padding-left: 38px; padding-right: 38px;">
             ${lhImgSrc ? '' : `
             <div style="display: flex; align-items: center; border-bottom: 3px solid #F57C00; padding-bottom: 8px; margin-bottom: 10px;">
                 <h1 style="margin: 0; color: #000080; font-size: 20px;">${(fullDatabase.lab_name || "SL DIAGNOSTIC CENTER").toUpperCase()}</h1>
@@ -782,7 +788,7 @@ function setupPortalPrintView(ptIndex) {
     }
 
     resultHtml += `</div>`;
-    return { html: resultHtml, lhImgSrc: lhImgSrc, pName: (p.name ? p.name.toUpperCase() : "Report"), pObj: p };
+    return { html: resultHtml, lhImgSrc: lhImgSrc, tMargin: tMargin, bMargin: bMargin, pName: (p.name ? p.name.toUpperCase() : "Report"), pObj: p };
 }
 
 function waitForPortalImg(imgEl) {
@@ -795,7 +801,7 @@ function waitForPortalImg(imgEl) {
     });
 }
 
-// 📥 MOBILE-SAFE PORTAL PDF ENGINE (Includes clinical notes & avoids html2canvas scale crash)
+// 🔥 MULTI-PAGE A4 PAGINATED PORTAL PDF ENGINE (Letterhead on every A4 page + safe top/bottom margins)
 async function generatePatientPDF(ptIndex) {
     if(typeof html2pdf === 'undefined') { alert("PDF Engine loading. Please wait..."); return; }
     await ensureReportsDataLoaded();
@@ -803,6 +809,7 @@ async function generatePatientPDF(ptIndex) {
     let reportData = setupPortalPrintView(ptIndex);
     if(typeof trackViewer === 'function') trackViewer('report_download', {patient_name:reportData.pObj.name||'', phone:reportData.pObj.phone||'', lab_no:reportData.pObj.lab_no||''});
 
+    const onSmallScreen = window.innerWidth <= 768;
     let overlay = document.createElement('div');
     overlay.style.position = 'fixed';
     overlay.style.top = '0';
@@ -814,48 +821,229 @@ async function generatePatientPDF(ptIndex) {
     overlay.style.zIndex = '999999';
     overlay.style.padding = '16px 10px';
     overlay.style.boxSizing = 'border-box';
-    overlay.innerHTML = '<div style="text-align:center; padding:12px; font-weight:bold; color:#2563EB; font-size:15px;">⏳ Generating PDF... Please wait 10-15 seconds.</div>';
-    
-    let pdfWrapper = document.createElement('div');
-    pdfWrapper.style.width = '794px';
-    pdfWrapper.style.minHeight = '1123px';
-    pdfWrapper.style.margin = '0 auto';
-    pdfWrapper.style.backgroundColor = '#ffffff';
-    pdfWrapper.style.color = '#000000';
-    pdfWrapper.style.position = 'relative';
-    pdfWrapper.style.overflow = 'hidden';
+    overlay.innerHTML = `<div style="text-align:center; padding:12px; font-weight:bold; color:#2563EB; font-size:15px;">${onSmallScreen ? '⏳ फ़ोन में PDF तैयार हो रही है (10-15 सेकंड लग सकते हैं)... स्क्रीन खुली रखें।' : '⏳ Generating PDF... Please wait.'}</div>`;
 
-    let bgImgEl = null;
-    if (reportData.lhImgSrc) {
-        bgImgEl = document.createElement('img');
-        bgImgEl.src = reportData.lhImgSrc;
-        bgImgEl.style.position = 'absolute';
-        bgImgEl.style.top = '0';
-        bgImgEl.style.left = '0';
-        bgImgEl.style.width = '794px';
-        bgImgEl.style.height = '1123px';
-        bgImgEl.style.objectFit = 'cover';
-        bgImgEl.style.zIndex = '0';
-        bgImgEl.style.pointerEvents = 'none';
-        pdfWrapper.appendChild(bgImgEl);
+    const PAGE_W_PX = 794;
+    const PAGE_H_PX = 1123;
+    const MM_TO_PX = PAGE_W_PX / 210;
+    const topPadPx = Math.round((reportData.tMargin || 45) * MM_TO_PX);
+    const botPadPx = Math.round((reportData.bMargin || 30) * MM_TO_PX);
+    const usableHeightPx = Math.max(420, PAGE_H_PX - topPadPx - botPadPx);
+
+    let measureContainer = document.createElement('div');
+    measureContainer.style.position = 'absolute';
+    measureContainer.style.left = '-9999px';
+    measureContainer.style.top = '0';
+    measureContainer.style.width = PAGE_W_PX + 'px';
+    measureContainer.style.backgroundColor = '#ffffff';
+    measureContainer.style.color = '#000000';
+    measureContainer.style.fontFamily = "'Poppins', sans-serif";
+    document.body.appendChild(measureContainer);
+
+    let tempHolder = document.createElement('div');
+    tempHolder.innerHTML = reportData.html;
+    let innerContent = tempHolder.querySelector('#portalReportInnerContent') || tempHolder;
+
+    let blocks = [];
+    Array.from(innerContent.children).forEach(child => {
+        if (child.tagName === 'TABLE') {
+            let thead = child.querySelector('thead');
+            let tbody = child.querySelector('tbody');
+            let rows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
+            if (rows.length > 0) {
+                let group = [];
+                rows.forEach(tr => {
+                    let isCatTitle = !!tr.querySelector('.test-category-title');
+                    if (isCatTitle && group.length > 0) {
+                        blocks.push({ type: 'tableGroup', theadHtml: thead ? thead.outerHTML : '', rows: group, style: child.getAttribute('style') || '' });
+                        group = [tr.outerHTML];
+                    } else {
+                        group.push(tr.outerHTML);
+                    }
+                });
+                if (group.length > 0) {
+                    blocks.push({ type: 'tableGroup', theadHtml: thead ? thead.outerHTML : '', rows: group, style: child.getAttribute('style') || '' });
+                }
+            } else {
+                blocks.push({ type: 'element', el: child.cloneNode(true) });
+            }
+        } else if (child.classList && child.classList.contains('portal-clinical-note')) {
+            let lines = child.querySelectorAll('.portal-note-line');
+            if (lines.length > 0) {
+                lines.forEach((lineEl, lIdx) => {
+                    let lineWrapper = document.createElement('div');
+                    lineWrapper.style.fontSize = '11px';
+                    lineWrapper.style.lineHeight = '1.45';
+                    lineWrapper.style.color = '#1E293B';
+                    lineWrapper.style.padding = '0 8px';
+                    if (lIdx === 0) {
+                        lineWrapper.style.borderTop = '1px solid #CBD5E1';
+                        lineWrapper.style.paddingTop = '6px';
+                    }
+                    lineWrapper.appendChild(lineEl.cloneNode(true));
+                    blocks.push({ type: 'element', el: lineWrapper });
+                });
+            } else {
+                blocks.push({ type: 'element', el: child.cloneNode(true) });
+            }
+        } else {
+            blocks.push({ type: 'element', el: child.cloneNode(true) });
+        }
+    });
+
+    function buildTableElement(groupObj, sliceRows) {
+        let tbl = document.createElement('table');
+        tbl.setAttribute('style', (groupObj.style || 'width:100%; border-collapse:collapse; margin-bottom:12px; font-size:12px;'));
+        tbl.innerHTML = `${groupObj.theadHtml || ''}<tbody>${sliceRows.join('')}</tbody>`;
+        return tbl;
     }
 
-    let fgBox = document.createElement('div');
-    fgBox.style.position = 'relative';
-    fgBox.style.zIndex = '1';
-    fgBox.innerHTML = reportData.html;
-    pdfWrapper.appendChild(fgBox);
+    function createPageElement() {
+        let pageEl = document.createElement('div');
+        pageEl.style.width = PAGE_W_PX + 'px';
+        pageEl.style.minHeight = PAGE_H_PX + 'px';
+        pageEl.style.position = 'relative';
+        pageEl.style.backgroundColor = '#ffffff';
+        pageEl.style.color = '#000000';
+        pageEl.style.boxSizing = 'border-box';
+        pageEl.style.pageBreakAfter = 'always';
+        pageEl.style.breakAfter = 'page';
 
+        if (reportData.lhImgSrc) {
+            let bgImg = document.createElement('img');
+            bgImg.src = reportData.lhImgSrc;
+            bgImg.style.position = 'absolute';
+            bgImg.style.top = '0';
+            bgImg.style.left = '0';
+            bgImg.style.width = PAGE_W_PX + 'px';
+            bgImg.style.height = PAGE_H_PX + 'px';
+            bgImg.style.objectFit = 'cover';
+            bgImg.style.zIndex = '0';
+            bgImg.style.pointerEvents = 'none';
+            pageEl.appendChild(bgImg);
+        }
+
+        let innerArea = document.createElement('div');
+        innerArea.style.position = 'relative';
+        innerArea.style.zIndex = '1';
+        innerArea.style.paddingTop = topPadPx + 'px';
+        innerArea.style.paddingBottom = botPadPx + 'px';
+        innerArea.style.paddingLeft = '38px';
+        innerArea.style.paddingRight = '38px';
+        innerArea.style.boxSizing = 'border-box';
+
+        pageEl.appendChild(innerArea);
+        return { pageEl, innerArea };
+    }
+
+    function measureHeight(node) {
+        measureContainer.innerHTML = '';
+        let wrap = document.createElement('div');
+        wrap.style.padding = '0 38px';
+        wrap.appendChild(node);
+        measureContainer.appendChild(wrap);
+        return Math.ceil(wrap.getBoundingClientRect().height || wrap.offsetHeight || 20);
+    }
+
+    let pages = [];
+    let current = createPageElement();
+    let currentUsedHeight = 0;
+
+    for (let i = 0; i < blocks.length; i++) {
+        let item = blocks[i];
+
+        if (item.type === 'tableGroup') {
+            let pendingRows = [...item.rows];
+            while (pendingRows.length > 0) {
+                let remaining = usableHeightPx - currentUsedHeight;
+                let testSample = buildTableElement(item, [pendingRows[0]]);
+                let firstRowH = measureHeight(testSample);
+
+                if (currentUsedHeight > 0 && remaining < firstRowH) {
+                    pages.push(current.pageEl);
+                    current = createPageElement();
+                    currentUsedHeight = 0;
+                    remaining = usableHeightPx;
+                }
+
+                let fitRows = [];
+                for (let r = 0; r < pendingRows.length; r++) {
+                    let candidateRows = [...fitRows, pendingRows[r]];
+                    let candidateTbl = buildTableElement(item, candidateRows);
+                    let h = measureHeight(candidateTbl);
+                    if (h <= remaining || fitRows.length === 0) {
+                        fitRows = candidateRows;
+                    } else {
+                        break;
+                    }
+                }
+
+                let placedTbl = buildTableElement(item, fitRows);
+                let placedH = measureHeight(placedTbl);
+                current.innerArea.appendChild(placedTbl);
+                currentUsedHeight += placedH;
+                pendingRows = pendingRows.slice(fitRows.length);
+
+                if (pendingRows.length > 0) {
+                    pages.push(current.pageEl);
+                    current = createPageElement();
+                    currentUsedHeight = 0;
+                }
+            }
+        } else {
+            let blk = item.el;
+            let blkHeight = measureHeight(blk.cloneNode(true));
+
+            if (currentUsedHeight > 0 && (currentUsedHeight + blkHeight) > usableHeightPx) {
+                pages.push(current.pageEl);
+                current = createPageElement();
+                currentUsedHeight = 0;
+            }
+
+            current.innerArea.appendChild(blk);
+            currentUsedHeight += blkHeight;
+        }
+    }
+
+    if (current.innerArea.children.length > 0 || pages.length === 0) {
+        pages.push(current.pageEl);
+    }
+
+    if (pages.length > 0) {
+        pages[pages.length - 1].style.pageBreakAfter = 'auto';
+        pages[pages.length - 1].style.breakAfter = 'auto';
+    }
+
+    document.body.removeChild(measureContainer);
+
+    let pdfWrapper = document.createElement('div');
+    pdfWrapper.style.width = PAGE_W_PX + 'px';
+    pdfWrapper.style.margin = '0 auto';
+    pdfWrapper.style.backgroundColor = '#ffffff';
+    pages.forEach(pEl => pdfWrapper.appendChild(pEl));
+
+    if (reportData.lhImgSrc) {
+        overlay.style.opacity = '0';
+    }
     overlay.appendChild(pdfWrapper);
     document.body.appendChild(overlay);
     window.scrollTo(0, 0);
     document.getElementById('loadingBar').style.display = 'block';
 
-    if (bgImgEl) {
-        await waitForPortalImg(bgImgEl);
+    if (reportData.lhImgSrc) {
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        pages.forEach(pEl => {
+            let bgImg = pEl.querySelector('img');
+            if (bgImg) {
+                let actualH = Math.max(pEl.scrollHeight, pEl.offsetHeight, PAGE_H_PX);
+                bgImg.style.height = actualH + 'px';
+            }
+        });
+        let allImgs = Array.from(pdfWrapper.querySelectorAll('img'));
+        await Promise.all(allImgs.map(waitForPortalImg));
+        overlay.style.opacity = '1';
     }
 
-    const onSmallScreen = window.innerWidth <= 768;
     let opt = {
         margin:       0,
         filename:     reportData.pName + '_Lab_Report.pdf',
