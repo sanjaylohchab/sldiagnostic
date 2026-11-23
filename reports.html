@@ -759,7 +759,6 @@
 
                     finalHtml += `</tbody></table>`;
 
-                    // 🔥 CLINICAL NOTE / COMMENT: Flows naturally across pages without blocking header/footer
                     if (dbTest && dbTest.clinical_note && dbTest.clinical_note.trim() !== '') {
                         finalHtml += `<div class="clinical-note-box">${formatClinicalNote(dbTest.clinical_note)}</div>`;
                     }
@@ -811,11 +810,11 @@
             });
         }
 
-        // 🔥 SAFE PAGE-BY-PAGE LETTERHEAD + TOP/BOTTOM MARGIN PDF COMPOSITOR
+        // 🔥 DIRECT JSPDF MULTI-PAGE LETTERHEAD + SAFE TOP/BOTTOM MARGIN COMPOSITOR
         async function downloadMobilePDF() {
             let auditPatient = fullDatabase.patients && fullDatabase.patients[printingPtIndex];
             if (auditPatient) recordAudit(`Downloaded PDF report for ${auditPatient.name || 'patient'}`, 'report');
-            if (typeof html2pdf === 'undefined') {
+            if (typeof html2pdf === 'undefined' || typeof html2canvas === 'undefined') {
                 alert("⏳ PDF Library is still loading... Please wait 2 seconds and click again.");
                 return;
             }
@@ -855,16 +854,16 @@
                 : '⏳ Generating Perfect PDF... Please wait.';
             overlay.appendChild(loadMsg);
 
-            // Convert mm to px on 794px A4 width (210mm = 794px -> ~3.7795px per mm)
-            const MM_TO_PX = 794 / 210;
+            const A4_W_MM = 210;
+            const A4_H_MM = 297;
             const PAGE_W_PX = 794;
             const PAGE_H_PX = 1123;
+            const MM_TO_PX = PAGE_W_PX / A4_W_MM;
             const sidePadPx = Math.round(10 * MM_TO_PX);
             const topPadPx = Math.round(tMargin * MM_TO_PX);
             const botPadPx = Math.round(bMargin * MM_TO_PX);
-            const usablePageHeightPx = Math.max(400, PAGE_H_PX - topPadPx - botPadPx);
+            const usablePageHeightPx = Math.max(300, PAGE_H_PX - topPadPx - botPadPx);
 
-            // Render content stream without top/bottom page spacer cells so we slice cleanly per page
             let sourceWrapper = document.createElement('div');
             sourceWrapper.style.width = PAGE_W_PX + 'px';
             sourceWrapper.style.backgroundColor = '#ffffff';
@@ -890,22 +889,16 @@
             let lhImgObj = null;
             if (showLh && lhImgSrc) {
                 lhImgObj = new Image();
-                lhImgObj.crossOrigin = 'anonymous';
                 lhImgObj.src = lhImgSrc;
                 await waitForImageReady(lhImgObj);
             }
 
-            const renderScale = onPhone ? 1.2 : 2;
+            const renderScale = onPhone ? 1.2 : 1.8;
 
             try {
-                if (typeof html2canvas === 'undefined') {
-                    throw new Error('html2canvas not available');
-                }
-
                 const contentCanvas = await html2canvas(sourceWrapper, {
                     scale: renderScale,
                     useCORS: true,
-                    allowTaint: true,
                     scrollY: 0,
                     backgroundColor: '#ffffff',
                     logging: false
@@ -919,58 +912,44 @@
                 const totalContentH = contentCanvas.height;
                 const totalPages = Math.max(1, Math.ceil(totalContentH / scaledUsableH));
 
-                // Build multi-page container where each A4 page has its own letterhead + top/bottom margins
-                let multiPageContainer = document.createElement('div');
-                multiPageContainer.id = 'pdfGenWrapper';
-                multiPageContainer.style.width = PAGE_W_PX + 'px';
-                multiPageContainer.style.margin = '0 auto';
-                multiPageContainer.style.backgroundColor = '#ffffff';
+                const worker = html2pdf().set({
+                    margin: 0,
+                    filename: pName + '_Lab_Report.pdf',
+                    image: { type: 'jpeg', quality: onPhone ? 0.85 : 0.95 },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                });
+
+                const pdf = await worker.toPdf().get('pdf');
 
                 for (let pageIndex = 0; pageIndex < totalPages; pageIndex++) {
-                    let pageCanvas = document.createElement('canvas');
-                    pageCanvas.width = scaledPageW;
-                    pageCanvas.height = scaledPageH;
-                    let ctx = pageCanvas.getContext('2d');
-
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(0, 0, scaledPageW, scaledPageH);
+                    if (pageIndex > 0) {
+                        pdf.addPage();
+                    }
 
                     if (showLh && lhImgObj && lhImgObj.complete && lhImgObj.naturalWidth > 0) {
-                        ctx.drawImage(lhImgObj, 0, 0, scaledPageW, scaledPageH);
+                        const fmt = lhImgSrc.includes('image/png') ? 'PNG' : 'JPEG';
+                        pdf.addImage(lhImgObj, fmt, 0, 0, A4_W_MM, A4_H_MM, undefined, 'FAST');
                     }
 
                     let srcY = pageIndex * scaledUsableH;
                     let sliceH = Math.min(scaledUsableH, totalContentH - srcY);
                     if (sliceH > 0) {
-                        ctx.drawImage(
+                        let sliceCanvas = document.createElement('canvas');
+                        sliceCanvas.width = scaledPageW;
+                        sliceCanvas.height = sliceH;
+                        let sCtx = sliceCanvas.getContext('2d');
+                        sCtx.drawImage(
                             contentCanvas,
                             0, srcY, scaledPageW, sliceH,
-                            0, scaledTop, scaledPageW, sliceH
+                            0, 0, scaledPageW, sliceH
                         );
+                        const sliceDataUrl = sliceCanvas.toDataURL('image/jpeg', onPhone ? 0.85 : 0.95);
+                        const sliceHeightMm = (sliceH / scaledUsableH) * (A4_H_MM - tMargin - bMargin);
+                        pdf.addImage(sliceDataUrl, 'JPEG', 0, tMargin, A4_W_MM, sliceHeightMm, undefined, 'FAST');
                     }
-
-                    let pageImg = document.createElement('img');
-                    pageImg.src = pageCanvas.toDataURL('image/jpeg', onPhone ? 0.85 : 0.95);
-                    pageImg.style.width = PAGE_W_PX + 'px';
-                    pageImg.style.height = PAGE_H_PX + 'px';
-                    pageImg.style.display = 'block';
-                    multiPageContainer.appendChild(pageImg);
                 }
 
-                sourceWrapper.remove();
-                overlay.appendChild(multiPageContainer);
-                await Promise.all(Array.from(multiPageContainer.querySelectorAll('img')).map(waitForImageReady));
-
-                let opt = {
-                    margin:       0,
-                    filename:     pName + '_Lab_Report.pdf',
-                    image:        { type: 'jpeg', quality: onPhone ? 0.85 : 1 },
-                    html2canvas:  { scale: 1, useCORS: true, allowTaint: true, scrollY: 0, logging: false },
-                    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-                    pagebreak:    { mode: ['css', 'legacy'] }
-                };
-
-                await html2pdf().set(opt).from(multiPageContainer).save();
+                pdf.save(pName + '_Lab_Report.pdf');
                 if (document.body.contains(overlay)) document.body.removeChild(overlay);
                 alert("✅ PDF Downloaded Successfully!");
             } catch (err) {
