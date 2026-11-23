@@ -122,6 +122,16 @@
             print-color-adjust: exact !important; 
         }
 
+        .clinical-note-box {
+            padding: 10px 8px;
+            border-top: 1px solid #CBD5E1;
+            font-size: 11px;
+            line-height: 1.45;
+            color: #1E293B;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
         #printableReportArea { display: none; }
         @page { size: A4 portrait; margin: 0mm !important; } 
         
@@ -644,7 +654,7 @@
                     
                     let isExclusive = tName.includes('*') || (dbTest && dbTest.name.includes('*'));
                     
-                    let tableStyle = 'width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; page-break-inside: avoid;';
+                    let tableStyle = 'width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 12px;';
                     
                     if (isExclusive) {
                         if (index !== 0) tableStyle += ' page-break-before: always; break-before: page;';
@@ -745,15 +755,16 @@
                         });
                     }
 
+                    finalHtml += `</tbody></table>`;
+
+                    // 🔥 CLINICAL NOTE / COMMENT: Kept clean & intact so large notes break cleanly onto next page with letterhead
                     if (dbTest && dbTest.clinical_note && dbTest.clinical_note.trim() !== '') {
-                        finalHtml += `<tr><td colspan="4" style="padding: 10px 8px; border-top: 1px solid #CBD5E1; font-size: 11px; line-height: 1.45; color: #1E293B;">${formatClinicalNote(dbTest.clinical_note)}</td></tr>`;
+                        finalHtml += `<div class="clinical-note-box">${formatClinicalNote(dbTest.clinical_note)}</div>`;
                     }
                     
                     if (index === totalTests - 1) {
-                        finalHtml += `<tr><td colspan="4" style="text-align: center; padding-top: 30px; padding-bottom: 10px; font-weight: bold; font-size: 12px; color: #333; border: none;">*** End of Report ***</td></tr>`;
+                        finalHtml += `<div style="text-align: center; padding-top: 24px; padding-bottom: 10px; font-weight: bold; font-size: 12px; color: #333; break-inside: avoid; page-break-inside: avoid;">*** End of Report ***</div>`;
                     }
-
-                    finalHtml += `</tbody></table>`;
                 });
             }
             
@@ -798,7 +809,7 @@
             });
         }
 
-        // 🔥 MOBILE & DESKTOP DIRECT PDF DOWNLOAD (No print fallback, waits for full report)
+        // 🔥 MULTI-PAGE LETTERHEAD + CLEAN COMMENT PAGE-BREAK PDF ENGINE
         async function downloadMobilePDF() {
             let auditPatient = fullDatabase.patients && fullDatabase.patients[printingPtIndex];
             if (auditPatient) recordAudit(`Downloaded PDF report for ${auditPatient.name || 'patient'}`, 'report');
@@ -842,30 +853,26 @@
                 : '⏳ Generating Perfect PDF... Please wait.';
             overlay.appendChild(loadMsg);
 
+            const A4_HEIGHT_PX = 1123;
             let pdfWrapper = document.createElement('div');
             pdfWrapper.id = 'pdfGenWrapper';
             pdfWrapper.style.width = '794px';
-            pdfWrapper.style.minHeight = '1123px';
+            pdfWrapper.style.minHeight = A4_HEIGHT_PX + 'px';
             pdfWrapper.style.margin = '0 auto';
             pdfWrapper.style.backgroundColor = '#ffffff';
             pdfWrapper.style.color = '#000000';
             pdfWrapper.style.position = 'relative';
             pdfWrapper.style.overflow = 'hidden';
 
-            let bgImgEl = null;
-            if (showLh && lhImgSrc) {
-                bgImgEl = document.createElement('img');
-                bgImgEl.src = lhImgSrc;
-                bgImgEl.style.position = 'absolute';
-                bgImgEl.style.top = '0';
-                bgImgEl.style.left = '0';
-                bgImgEl.style.width = '794px';
-                bgImgEl.style.height = '1123px';
-                bgImgEl.style.objectFit = 'cover';
-                bgImgEl.style.zIndex = '0';
-                bgImgEl.style.pointerEvents = 'none';
-                pdfWrapper.appendChild(bgImgEl);
-            }
+            let bgLayer = document.createElement('div');
+            bgLayer.style.position = 'absolute';
+            bgLayer.style.top = '0';
+            bgLayer.style.left = '0';
+            bgLayer.style.width = '794px';
+            bgLayer.style.height = '100%';
+            bgLayer.style.zIndex = '0';
+            bgLayer.style.pointerEvents = 'none';
+            pdfWrapper.appendChild(bgLayer);
 
             let contentNode = document.getElementById('printContentWrapper').cloneNode(true);
             contentNode.style.display = 'block';
@@ -889,8 +896,28 @@
             overlay.scrollTop = 0;
             window.scrollTo(0, 0);
 
-            if (bgImgEl) {
-                await waitForImageReady(bgImgEl);
+            // Repeat letterhead on every A4 page height so page 2 & 3 also get letterhead
+            let pageImages = [];
+            if (showLh && lhImgSrc) {
+                await new Promise(resolve => {
+                    requestAnimationFrame(() => requestAnimationFrame(resolve));
+                });
+                const totalHeight = Math.max(pdfWrapper.scrollHeight, A4_HEIGHT_PX);
+                const pageCount = Math.max(1, Math.ceil(totalHeight / A4_HEIGHT_PX));
+                for (let pIdx = 0; pIdx < pageCount; pIdx++) {
+                    let pageBg = document.createElement('img');
+                    pageBg.src = lhImgSrc;
+                    pageBg.style.position = 'absolute';
+                    pageBg.style.top = (pIdx * A4_HEIGHT_PX) + 'px';
+                    pageBg.style.left = '0';
+                    pageBg.style.width = '794px';
+                    pageBg.style.height = A4_HEIGHT_PX + 'px';
+                    pageBg.style.objectFit = 'cover';
+                    pageBg.style.pointerEvents = 'none';
+                    bgLayer.appendChild(pageBg);
+                    pageImages.push(pageBg);
+                }
+                await Promise.all(pageImages.map(waitForImageReady));
             }
 
             let opt = {
