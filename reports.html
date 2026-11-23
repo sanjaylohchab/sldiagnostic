@@ -78,6 +78,29 @@
             padding: 10px 15px; border-bottom: 1px solid #F1F5F9; align-items: center;
         }
         .editor-grid-row:last-child { border-bottom: none; }
+
+        .include-note-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 10px 15px;
+            background: #F8FAFC;
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+            color: #1E293B;
+        }
+        .include-note-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+            font-size: 12px;
+            font-weight: 600;
+            color: #1E293B;
+            cursor: pointer;
+            text-transform: none;
+        }
         
         .param-name { font-size: 13px; font-weight: 600; color: var(--primary); display: flex; align-items: center; gap: 6px; }
         .inp-res { font-weight: 700; color: #1E293B; border: 1px solid #CBD5E1; transition: 0.2s; }
@@ -434,6 +457,16 @@
             else { resInp.classList.add('abnormal'); resInp.setAttribute('data-abnormal', 'true'); }
         }
 
+        function getSavedIncludeNote(p, sTName, legacySTName) {
+            if (p && p.test_results && p.test_results[sTName] && p.test_results[sTName]._include_note !== undefined) {
+                return !!p.test_results[sTName]._include_note;
+            }
+            if (p && p.test_results && legacySTName && p.test_results[legacySTName] && p.test_results[legacySTName]._include_note !== undefined) {
+                return !!p.test_results[legacySTName]._include_note;
+            }
+            return false;
+        }
+
         function openEditor(idx) {
             editingPtIndex = idx;
             let p = fullDatabase.patients[idx];
@@ -443,10 +476,14 @@
             let area = document.getElementById('resultInputsArea'); area.innerHTML = '';
             
             if(p.selected_tests) {
-                p.selected_tests.forEach(tName => {
+                p.selected_tests.forEach((tName, tIdx) => {
                     let cleanTName = tName.replace(/\*/g, '').trim();
                     let dbTest = fullDatabase.tests.find(t => t.name.replace(/\*/g, '').trim().toUpperCase() === cleanTName.toUpperCase());
                     let params = dbTest && dbTest.parameters ? dbTest.parameters : [{name: cleanTName, unit: '-', range: '-'}];
+                    let hasClinicalNote = !!(dbTest && dbTest.clinical_note && dbTest.clinical_note.trim() !== '');
+                    let sTName = safeKey(cleanTName);
+                    let oldSTName = safeKey(tName);
+                    let savedIncludeNote = getSavedIncludeNote(p, sTName, oldSTName);
                     
                     let group = `<div class="test-group"><div class="group-title">🧪 ${cleanTName.toUpperCase()}</div>
                         <div class="editor-grid-header"><div>Parameter</div><div>Result (Tab ➡)</div><div>Unit</div><div>Normal Range</div></div>`;
@@ -461,12 +498,10 @@
                             return; 
                         }
 
-                        let sTName = safeKey(cleanTName);
                         let sPName = safeKey(param.name);
                         
                         let existing = (p.test_results && p.test_results[sTName]) ? p.test_results[sTName][sPName] : undefined;
                         if (existing === undefined) {
-                            let oldSTName = safeKey(tName);
                             existing = (p.test_results && p.test_results[oldSTName]) ? p.test_results[oldSTName][sPName] : undefined;
                         }
 
@@ -501,6 +536,18 @@
                                 <div><input type="text" id="range_${cleanTName}_${param.name}" class="inp-range" tabindex="-1" value="${range}"></div>
                             </div>`;
                     });
+
+                    if (hasClinicalNote) {
+                        let noteCbId = `inc_note_${tIdx}`;
+                        group += `
+                            <div class="include-note-bar">
+                                <label class="include-note-label" for="${noteCbId}">
+                                    <input type="checkbox" id="${noteCbId}" ${savedIncludeNote ? 'checked' : ''} style="width:auto; margin:0; cursor:pointer;">
+                                    <span>Include clinical note in report</span>
+                                </label>
+                            </div>`;
+                    }
+
                     group += `</div>`; area.innerHTML += group;
                 });
             }
@@ -512,7 +559,7 @@
             if(!p.test_results) p.test_results = {};
             
             if(p.selected_tests) {
-                p.selected_tests.forEach(tName => {
+                p.selected_tests.forEach((tName, tIdx) => {
                     let cleanTName = tName.replace(/\*/g, '').trim();
                     let dbTest = fullDatabase.tests.find(t => t.name.replace(/\*/g, '').trim().toUpperCase() === cleanTName.toUpperCase());
                     let params = dbTest && dbTest.parameters ? dbTest.parameters : [{name: cleanTName}];
@@ -537,6 +584,9 @@
                             };
                         }
                     });
+
+                    let noteCb = document.getElementById(`inc_note_${tIdx}`);
+                    p.test_results[sTName]._include_note = noteCb ? !!noteCb.checked : false;
                 });
             }
 
@@ -713,6 +763,8 @@
                     let cleanTName = tName.replace(/\*/g, '').trim();
                     let dbTest = fullDatabase.tests.find(t => t.name.replace(/\*/g, '').trim().toUpperCase() === cleanTName.toUpperCase());
                     let params = dbTest && dbTest.parameters ? dbTest.parameters : [{name: cleanTName, unit: "-", range: "-"}];
+                    let sTName = safeKey(cleanTName);
+                    let oldSTName = safeKey(tName);
                     
                     let tableStyle = 'width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 12px;';
 
@@ -737,12 +789,10 @@
                         let impressionText = "";
 
                         params.forEach(param => {
-                            let sTName = safeKey(cleanTName);
                             let sPName = safeKey(param.name);
                             let existing = (p.test_results && p.test_results[sTName]) ? p.test_results[sTName][sPName] : undefined;
                             
                             if (existing === undefined) {
-                                let oldSTName = safeKey(tName);
                                 existing = (p.test_results && p.test_results[oldSTName]) ? p.test_results[oldSTName][sPName] : undefined;
                             }
 
@@ -786,12 +836,10 @@
                                 return;
                             }
 
-                            let sTName = safeKey(cleanTName);
                             let sPName = safeKey(param.name);
                             let existing = (p.test_results && p.test_results[sTName]) ? p.test_results[sTName][sPName] : undefined;
                             
                             if (existing === undefined) {
-                                let oldSTName = safeKey(tName);
                                 existing = (p.test_results && p.test_results[oldSTName]) ? p.test_results[oldSTName][sPName] : undefined;
                             }
 
@@ -812,7 +860,8 @@
 
                     finalHtml += `</tbody></table>`;
 
-                    if (dbTest && dbTest.clinical_note && dbTest.clinical_note.trim() !== '') {
+                    let includeNote = getSavedIncludeNote(p, sTName, oldSTName);
+                    if (includeNote && dbTest && dbTest.clinical_note && dbTest.clinical_note.trim() !== '') {
                         finalHtml += `<div class="clinical-note-box">${formatClinicalNote(dbTest.clinical_note)}</div>`;
                     }
                     
@@ -863,7 +912,6 @@
             });
         }
 
-        // 🔥 SINGLE-PASS SLICED PDF ENGINE (Prevents duplicate report without letterhead)
         async function downloadMobilePDF() {
             let auditPatient = fullDatabase.patients && fullDatabase.patients[printingPtIndex];
             if (auditPatient) recordAudit(`Downloaded PDF report for ${auditPatient.name || 'patient'}`, 'report');
@@ -907,22 +955,23 @@
                 : '⏳ Generating Perfect PDF... Please wait.';
             overlay.appendChild(loadMsg);
 
-            const A4_W_MM = 210;
-            const A4_H_MM = 297;
             const PAGE_W_PX = 794;
-            const MM_TO_PX = PAGE_W_PX / A4_W_MM;
+            const PAGE_H_PX = 1123;
+            const MM_TO_PX = PAGE_W_PX / 210;
             const sidePadPx = Math.round(10 * MM_TO_PX);
-            const usableHeightMm = Math.max(80, A4_H_MM - tMargin - bMargin);
+            const topPadPx = Math.round(tMargin * MM_TO_PX);
+            const botPadPx = Math.round(bMargin * MM_TO_PX);
+            const usableHeightPx = Math.max(420, PAGE_H_PX - topPadPx - botPadPx);
 
-            let contentBox = document.createElement('div');
-            contentBox.id = 'pdfGenWrapper';
-            contentBox.style.width = PAGE_W_PX + 'px';
-            contentBox.style.margin = '0 auto';
-            contentBox.style.padding = `8px ${sidePadPx}px`;
-            contentBox.style.backgroundColor = '#ffffff';
-            contentBox.style.color = '#000000';
-            contentBox.style.boxSizing = 'border-box';
-            contentBox.style.fontFamily = "'Poppins', sans-serif";
+            let measureContainer = document.createElement('div');
+            measureContainer.style.position = 'absolute';
+            measureContainer.style.left = '-9999px';
+            measureContainer.style.top = '0';
+            measureContainer.style.width = (PAGE_W_PX - sidePadPx * 2) + 'px';
+            measureContainer.style.backgroundColor = '#ffffff';
+            measureContainer.style.color = '#000000';
+            measureContainer.style.fontFamily = "'Poppins', sans-serif";
+            document.body.appendChild(measureContainer);
 
             let contentNode = document.getElementById('printContentWrapper').cloneNode(true);
             contentNode.style.display = 'block';
@@ -932,93 +981,218 @@
                 clonedTextHeader.style.display = showTextHeader ? 'flex' : 'none';
             }
 
-            contentBox.appendChild(contentNode);
-            overlay.appendChild(contentBox);
+            let blocks = [];
+            const headerEl = contentNode.querySelector('#prTextHeader');
+            if (headerEl && headerEl.style.display !== 'none') blocks.push(headerEl.cloneNode(true));
 
-            // Empty 1px seed element so toPdf() creates a clean blank PDF without rendering contentBox twice
-            let blankSeed = document.createElement('div');
-            blankSeed.style.width = '1px';
-            blankSeed.style.height = '1px';
-            blankSeed.style.opacity = '0';
-            overlay.appendChild(blankSeed);
+            const infoTable = contentNode.querySelector('.rep-info-table');
+            if (infoTable) blocks.push(infoTable.cloneNode(true));
 
-            document.body.appendChild(overlay);
-
-            window.scrollTo(0, 0);
-            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-
-            let lhImgObj = null;
-            let lhFormat = 'JPEG';
-            if (showLh && lhImgSrc) {
-                if (lhImgSrc.startsWith('data:image/png') || lhImgSrc.toLowerCase().includes('.png')) {
-                    lhFormat = 'PNG';
-                }
-                lhImgObj = new Image();
-                lhImgObj.src = lhImgSrc;
-                await waitForImageReady(lhImgObj);
+            const dynArea = contentNode.querySelector('#sl-dynamic-report');
+            if (dynArea) {
+                Array.from(dynArea.children).forEach(child => {
+                    if (child.tagName === 'TABLE' && child.classList.contains('rep-main-table')) {
+                        let thead = child.querySelector('thead');
+                        let tbody = child.querySelector('tbody');
+                        let rows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
+                        if (rows.length > 0) {
+                            let group = [];
+                            rows.forEach((tr) => {
+                                let isCatTitle = !!tr.querySelector('.test-category-title');
+                                if (isCatTitle && group.length > 0) {
+                                    blocks.push({ type: 'tableGroup', theadHtml: thead ? thead.outerHTML : '', rows: group, style: child.getAttribute('style') || '' });
+                                    group = [tr.outerHTML];
+                                } else {
+                                    group.push(tr.outerHTML);
+                                }
+                            });
+                            if (group.length > 0) {
+                                blocks.push({ type: 'tableGroup', theadHtml: thead ? thead.outerHTML : '', rows: group, style: child.getAttribute('style') || '' });
+                            }
+                        } else {
+                            blocks.push({ type: 'element', el: child.cloneNode(true) });
+                        }
+                    } else if (child.classList && child.classList.contains('clinical-note-box')) {
+                        let lines = child.querySelectorAll('.clinical-note-line');
+                        if (lines.length > 0) {
+                            lines.forEach((lineEl, lIdx) => {
+                                let lineWrapper = document.createElement('div');
+                                lineWrapper.style.fontSize = '11px';
+                                lineWrapper.style.lineHeight = '1.45';
+                                lineWrapper.style.color = '#1E293B';
+                                lineWrapper.style.padding = '0 8px';
+                                if (lIdx === 0) {
+                                    lineWrapper.style.borderTop = '1px solid #CBD5E1';
+                                    lineWrapper.style.paddingTop = '6px';
+                                }
+                                lineWrapper.appendChild(lineEl.cloneNode(true));
+                                blocks.push({ type: 'element', el: lineWrapper });
+                            });
+                        } else {
+                            blocks.push({ type: 'element', el: child.cloneNode(true) });
+                        }
+                    } else {
+                        blocks.push({ type: 'element', el: child.cloneNode(true) });
+                    }
+                });
             }
 
-            const renderScale = onPhone ? 1.3 : 1.8;
+            function buildTableElement(groupObj, sliceRows) {
+                let tbl = document.createElement('table');
+                tbl.className = 'rep-main-table';
+                tbl.setAttribute('style', (groupObj.style || 'width:100%; border-collapse:collapse; margin-bottom:10px; font-size:12px;'));
+                tbl.innerHTML = `${groupObj.theadHtml || ''}<tbody>${sliceRows.join('')}</tbody>`;
+                return tbl;
+            }
 
-            try {
-                const canvasWorker = html2pdf().set({
-                    margin: 0,
-                    image: { type: 'jpeg', quality: onPhone ? 0.88 : 0.96 },
-                    html2canvas: {
-                        scale: renderScale,
-                        useCORS: true,
-                        scrollY: 0,
-                        backgroundColor: '#ffffff',
-                        logging: false
-                    },
-                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-                });
+            function createPageElement() {
+                let pageEl = document.createElement('div');
+                pageEl.style.width = PAGE_W_PX + 'px';
+                pageEl.style.height = PAGE_H_PX + 'px';
+                pageEl.style.position = 'relative';
+                pageEl.style.backgroundColor = '#ffffff';
+                pageEl.style.color = '#000000';
+                pageEl.style.boxSizing = 'border-box';
+                pageEl.style.overflow = 'hidden';
 
-                const canvas = await canvasWorker.from(contentBox).toCanvas().get('canvas');
-
-                const pdfWorker = html2pdf().set({
-                    margin: 0,
-                    filename: pName + '_Lab_Report.pdf',
-                    image: { type: 'jpeg', quality: onPhone ? 0.88 : 0.96 },
-                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-                });
-                const pdf = await pdfWorker.from(blankSeed).toPdf().get('pdf');
-
-                const pxPerMm = canvas.width / A4_W_MM;
-                const sliceHeightPx = Math.max(100, Math.round(usableHeightMm * pxPerMm));
-                const totalContentPx = canvas.height;
-                const pageCount = Math.max(1, Math.ceil(totalContentPx / sliceHeightPx));
-
-                for (let pIdx = 0; pIdx < pageCount; pIdx++) {
-                    if (pIdx > 0) {
-                        pdf.addPage();
-                    }
-
-                    if (showLh && lhImgObj && lhImgObj.complete && lhImgObj.naturalWidth > 0) {
-                        pdf.addImage(lhImgObj, lhFormat, 0, 0, A4_W_MM, A4_H_MM, undefined, 'FAST');
-                    }
-
-                    let srcY = pIdx * sliceHeightPx;
-                    let currentSlicePx = Math.min(sliceHeightPx, totalContentPx - srcY);
-                    if (currentSlicePx > 0) {
-                        let pageSliceCanvas = document.createElement('canvas');
-                        pageSliceCanvas.width = canvas.width;
-                        pageSliceCanvas.height = currentSlicePx;
-                        let sCtx = pageSliceCanvas.getContext('2d');
-                        sCtx.fillStyle = '#ffffff';
-                        sCtx.fillRect(0, 0, pageSliceCanvas.width, pageSliceCanvas.height);
-                        sCtx.drawImage(
-                            canvas,
-                            0, srcY, canvas.width, currentSlicePx,
-                            0, 0, canvas.width, currentSlicePx
-                        );
-                        const sliceDataUrl = pageSliceCanvas.toDataURL('image/jpeg', onPhone ? 0.88 : 0.96);
-                        const sliceHeightMm = currentSlicePx / pxPerMm;
-                        pdf.addImage(sliceDataUrl, 'JPEG', 0, tMargin, A4_W_MM, sliceHeightMm, undefined, 'FAST');
-                    }
+                if (showLh && lhImgSrc) {
+                    let bgImg = document.createElement('img');
+                    bgImg.src = lhImgSrc;
+                    bgImg.style.position = 'absolute';
+                    bgImg.style.top = '0';
+                    bgImg.style.left = '0';
+                    bgImg.style.width = PAGE_W_PX + 'px';
+                    bgImg.style.height = PAGE_H_PX + 'px';
+                    bgImg.style.objectFit = 'cover';
+                    bgImg.style.zIndex = '0';
+                    bgImg.style.pointerEvents = 'none';
+                    pageEl.appendChild(bgImg);
                 }
 
-                pdf.save(pName + '_Lab_Report.pdf');
+                let innerArea = document.createElement('div');
+                innerArea.style.position = 'relative';
+                innerArea.style.zIndex = '1';
+                innerArea.style.marginTop = topPadPx + 'px';
+                innerArea.style.marginLeft = sidePadPx + 'px';
+                innerArea.style.marginRight = sidePadPx + 'px';
+                innerArea.style.height = usableHeightPx + 'px';
+                innerArea.style.maxHeight = usableHeightPx + 'px';
+                innerArea.style.overflow = 'hidden';
+                innerArea.style.boxSizing = 'border-box';
+
+                pageEl.appendChild(innerArea);
+                return { pageEl, innerArea };
+            }
+
+            function measureHeight(node) {
+                measureContainer.innerHTML = '';
+                measureContainer.appendChild(node);
+                return Math.ceil(node.getBoundingClientRect().height || node.offsetHeight || 20);
+            }
+
+            let pages = [];
+            let current = createPageElement();
+            let currentUsedHeight = 0;
+
+            for (let i = 0; i < blocks.length; i++) {
+                let item = blocks[i];
+
+                if (item.type === 'tableGroup') {
+                    let pendingRows = [...item.rows];
+                    while (pendingRows.length > 0) {
+                        let remaining = usableHeightPx - currentUsedHeight;
+                        let testSample = buildTableElement(item, [pendingRows[0]]);
+                        let firstRowH = measureHeight(testSample);
+
+                        if (currentUsedHeight > 0 && remaining < firstRowH) {
+                            pages.push(current.pageEl);
+                            current = createPageElement();
+                            currentUsedHeight = 0;
+                            remaining = usableHeightPx;
+                        }
+
+                        let fitRows = [];
+                        for (let r = 0; r < pendingRows.length; r++) {
+                            let candidateRows = [...fitRows, pendingRows[r]];
+                            let candidateTbl = buildTableElement(item, candidateRows);
+                            let h = measureHeight(candidateTbl);
+                            if (h <= remaining || fitRows.length === 0) {
+                                fitRows = candidateRows;
+                            } else {
+                                break;
+                            }
+                        }
+
+                        let placedTbl = buildTableElement(item, fitRows);
+                        let placedH = measureHeight(placedTbl);
+                        current.innerArea.appendChild(placedTbl);
+                        currentUsedHeight += placedH;
+                        pendingRows = pendingRows.slice(fitRows.length);
+
+                        if (pendingRows.length > 0) {
+                            pages.push(current.pageEl);
+                            current = createPageElement();
+                            currentUsedHeight = 0;
+                        }
+                    }
+                } else {
+                    let blk = item.el;
+                    let blkHeight = measureHeight(blk.cloneNode(true));
+
+                    if (currentUsedHeight > 0 && (currentUsedHeight + blkHeight) > usableHeightPx) {
+                        pages.push(current.pageEl);
+                        current = createPageElement();
+                        currentUsedHeight = 0;
+                    }
+
+                    current.innerArea.appendChild(blk);
+                    currentUsedHeight += blkHeight;
+                }
+            }
+
+            if (current.innerArea.children.length > 0 || pages.length === 0) {
+                pages.push(current.pageEl);
+            }
+
+            document.body.removeChild(measureContainer);
+
+            let pdfWrapper = document.createElement('div');
+            pdfWrapper.id = 'pdfGenWrapper';
+            pdfWrapper.style.width = PAGE_W_PX + 'px';
+            pdfWrapper.style.margin = '0 auto';
+            pages.forEach(pEl => pdfWrapper.appendChild(pEl));
+
+            if (showLh && lhImgSrc) {
+                overlay.style.opacity = '0';
+                document.body.appendChild(overlay);
+            }
+
+            if (!document.body.contains(overlay)) {
+                overlay.appendChild(pdfWrapper);
+                document.body.appendChild(overlay);
+            } else {
+                overlay.appendChild(pdfWrapper);
+            }
+
+            window.scrollTo(0, 0);
+
+            if (showLh && lhImgSrc) {
+                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                let allBgImgs = Array.from(pdfWrapper.querySelectorAll('img'));
+                await Promise.all(allBgImgs.map(waitForImageReady));
+                overlay.style.opacity = '1';
+            }
+
+            let opt = {
+                margin:       0,
+                filename:     pName + '_Lab_Report.pdf',
+                image:        { type: 'jpeg', quality: onPhone ? 0.85 : 1 },
+                html2canvas:  { scale: onPhone ? 1.25 : 2, useCORS: true, allowTaint: true, scrollY: 0, logging: false },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            try {
+                await html2pdf().set(opt).from(pdfWrapper).save();
                 if (document.body.contains(overlay)) document.body.removeChild(overlay);
                 alert("✅ PDF Downloaded Successfully!");
             } catch (err) {
