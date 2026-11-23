@@ -135,15 +135,15 @@
         }
 
         .report-sign-footer-block {
-            margin-top: 26px;
-            padding-top: 10px;
+            margin-top: 24px;
+            padding-top: 8px;
             break-inside: avoid;
             page-break-inside: avoid;
         }
         .sign-row-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 24px;
+            margin-top: 22px;
             font-size: 11px;
             color: #111827;
         }
@@ -870,7 +870,7 @@
             });
         }
 
-        // 🔥 MULTI-PAGE A4 PAGINATED PDF ENGINE (1 to 5+ pages, letterhead on every page, strict top/bottom margin protection)
+        // 🔥 BLANK-PAGE-FREE & FULL-CONTENT A4 PAGINATED PDF ENGINE
         async function downloadMobilePDF() {
             let auditPatient = fullDatabase.patients && fullDatabase.patients[printingPtIndex];
             if (auditPatient) recordAudit(`Downloaded PDF report for ${auditPatient.name || 'patient'}`, 'report');
@@ -920,7 +920,7 @@
             const sidePadPx = Math.round(10 * MM_TO_PX);
             const topPadPx = Math.round(tMargin * MM_TO_PX);
             const botPadPx = Math.round(bMargin * MM_TO_PX);
-            const usableHeightPx = Math.max(350, PAGE_H_PX - topPadPx - botPadPx);
+            const usableHeightPx = Math.max(420, PAGE_H_PX - topPadPx - botPadPx);
 
             let measureContainer = document.createElement('div');
             measureContainer.style.position = 'absolute';
@@ -940,6 +940,7 @@
                 clonedTextHeader.style.display = showTextHeader ? 'flex' : 'none';
             }
 
+            // Collect blocks so all selected tests & notes are preserved without dropping any test
             let blocks = [];
             const headerEl = contentNode.querySelector('#prTextHeader');
             if (headerEl && headerEl.style.display !== 'none') blocks.push(headerEl.cloneNode(true));
@@ -950,7 +951,29 @@
             const dynArea = contentNode.querySelector('#sl-dynamic-report');
             if (dynArea) {
                 Array.from(dynArea.children).forEach(child => {
-                    if (child.classList && child.classList.contains('clinical-note-box')) {
+                    if (child.tagName === 'TABLE' && child.classList.contains('rep-main-table')) {
+                        // Keep test header + individual rows together so no test gets skipped
+                        let thead = child.querySelector('thead');
+                        let tbody = child.querySelector('tbody');
+                        let rows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
+                        if (rows.length > 0) {
+                            let group = [];
+                            rows.forEach((tr) => {
+                                let isCatTitle = !!tr.querySelector('.test-category-title');
+                                if (isCatTitle && group.length > 0) {
+                                    blocks.push({ type: 'tableGroup', theadHtml: thead ? thead.outerHTML : '', rows: group, style: child.getAttribute('style') || '' });
+                                    group = [tr.outerHTML];
+                                } else {
+                                    group.push(tr.outerHTML);
+                                }
+                            });
+                            if (group.length > 0) {
+                                blocks.push({ type: 'tableGroup', theadHtml: thead ? thead.outerHTML : '', rows: group, style: child.getAttribute('style') || '' });
+                            }
+                        } else {
+                            blocks.push({ type: 'element', el: child.cloneNode(true) });
+                        }
+                    } else if (child.classList && child.classList.contains('clinical-note-box')) {
                         let lines = child.querySelectorAll('.clinical-note-line');
                         if (lines.length > 0) {
                             lines.forEach((lineEl, lIdx) => {
@@ -964,25 +987,32 @@
                                     lineWrapper.style.paddingTop = '6px';
                                 }
                                 lineWrapper.appendChild(lineEl.cloneNode(true));
-                                blocks.push(lineWrapper);
+                                blocks.push({ type: 'element', el: lineWrapper });
                             });
                         } else {
-                            blocks.push(child.cloneNode(true));
+                            blocks.push({ type: 'element', el: child.cloneNode(true) });
                         }
                     } else {
-                        blocks.push(child.cloneNode(true));
+                        blocks.push({ type: 'element', el: child.cloneNode(true) });
                     }
                 });
+            }
+
+            function buildTableElement(groupObj, sliceRows) {
+                let tbl = document.createElement('table');
+                tbl.className = 'rep-main-table';
+                tbl.setAttribute('style', (groupObj.style || 'width:100%; border-collapse:collapse; margin-bottom:10px; font-size:12px;'));
+                tbl.innerHTML = `${groupObj.theadHtml || ''}<tbody>${sliceRows.join('')}</tbody>`;
+                return tbl;
             }
 
             function createPageElement() {
                 let pageEl = document.createElement('div');
                 pageEl.style.width = PAGE_W_PX + 'px';
-                pageEl.style.height = PAGE_H_PX + 'px';
+                pageEl.style.minHeight = PAGE_H_PX + 'px';
                 pageEl.style.position = 'relative';
                 pageEl.style.backgroundColor = '#ffffff';
                 pageEl.style.color = '#000000';
-                pageEl.style.overflow = 'hidden';
                 pageEl.style.boxSizing = 'border-box';
                 pageEl.style.pageBreakAfter = 'always';
                 pageEl.style.breakAfter = 'page';
@@ -1004,16 +1034,20 @@
                 let innerArea = document.createElement('div');
                 innerArea.style.position = 'relative';
                 innerArea.style.zIndex = '1';
-                innerArea.style.marginTop = topPadPx + 'px';
-                innerArea.style.marginLeft = sidePadPx + 'px';
-                innerArea.style.marginRight = sidePadPx + 'px';
-                innerArea.style.height = usableHeightPx + 'px';
-                innerArea.style.maxHeight = usableHeightPx + 'px';
-                innerArea.style.overflow = 'hidden';
+                innerArea.style.paddingTop = topPadPx + 'px';
+                innerArea.style.paddingBottom = botPadPx + 'px';
+                innerArea.style.paddingLeft = sidePadPx + 'px';
+                innerArea.style.paddingRight = sidePadPx + 'px';
                 innerArea.style.boxSizing = 'border-box';
 
                 pageEl.appendChild(innerArea);
                 return { pageEl, innerArea };
+            }
+
+            function measureHeight(node) {
+                measureContainer.innerHTML = '';
+                measureContainer.appendChild(node);
+                return Math.ceil(node.getBoundingClientRect().height || node.offsetHeight || 20);
             }
 
             let pages = [];
@@ -1021,22 +1055,72 @@
             let currentUsedHeight = 0;
 
             for (let i = 0; i < blocks.length; i++) {
-                let blk = blocks[i];
-                let probe = blk.cloneNode(true);
-                measureContainer.innerHTML = '';
-                measureContainer.appendChild(probe);
-                let blkHeight = probe.getBoundingClientRect().height || probe.offsetHeight || 20;
+                let item = blocks[i];
 
-                if (currentUsedHeight > 0 && (currentUsedHeight + blkHeight) > usableHeightPx) {
-                    pages.push(current.pageEl);
-                    current = createPageElement();
-                    currentUsedHeight = 0;
+                if (item.type === 'tableGroup') {
+                    // Split table rows across pages cleanly so every test and every row appears without blank pages
+                    let pendingRows = [...item.rows];
+                    while (pendingRows.length > 0) {
+                        let remaining = usableHeightPx - currentUsedHeight;
+                        let testSample = buildTableElement(item, [pendingRows[0]]);
+                        let firstRowH = measureHeight(testSample);
+
+                        if (currentUsedHeight > 0 && remaining < firstRowH) {
+                            pages.push(current.pageEl);
+                            current = createPageElement();
+                            currentUsedHeight = 0;
+                            remaining = usableHeightPx;
+                        }
+
+                        let fitRows = [];
+                        for (let r = 0; r < pendingRows.length; r++) {
+                            let candidateRows = [...fitRows, pendingRows[r]];
+                            let candidateTbl = buildTableElement(item, candidateRows);
+                            let h = measureHeight(candidateTbl);
+                            if (h <= remaining || fitRows.length === 0) {
+                                fitRows = candidateRows;
+                            } else {
+                                break;
+                            }
+                        }
+
+                        let placedTbl = buildTableElement(item, fitRows);
+                        let placedH = measureHeight(placedTbl);
+                        current.innerArea.appendChild(placedTbl);
+                        currentUsedHeight += placedH;
+                        pendingRows = pendingRows.slice(fitRows.length);
+
+                        if (pendingRows.length > 0) {
+                            pages.push(current.pageEl);
+                            current = createPageElement();
+                            currentUsedHeight = 0;
+                        }
+                    }
+                } else {
+                    let blk = item.el;
+                    let blkHeight = measureHeight(blk.cloneNode(true));
+
+                    if (currentUsedHeight > 0 && (currentUsedHeight + blkHeight) > usableHeightPx) {
+                        pages.push(current.pageEl);
+                        current = createPageElement();
+                        currentUsedHeight = 0;
+                    }
+
+                    current.innerArea.appendChild(blk);
+                    currentUsedHeight += blkHeight;
                 }
-
-                current.innerArea.appendChild(blk);
-                currentUsedHeight += blkHeight;
             }
-            pages.push(current.pageEl);
+
+            // Push final page only if it has content (prevents trailing blank pages)
+            if (current.innerArea.children.length > 0 || pages.length === 0) {
+                pages.push(current.pageEl);
+            }
+
+            // Ensure each page's letterhead image matches that page's actual rendered height
+            if (showLh && lhImgSrc) {
+                overlay.style.opacity = '0';
+                document.body.appendChild(overlay);
+            }
 
             if (pages.length > 0) {
                 pages[pages.length - 1].style.pageBreakAfter = 'auto';
@@ -1051,13 +1135,27 @@
             pdfWrapper.style.margin = '0 auto';
             pages.forEach(pEl => pdfWrapper.appendChild(pEl));
 
-            overlay.appendChild(pdfWrapper);
-            document.body.appendChild(overlay);
+            if (!document.body.contains(overlay)) {
+                overlay.appendChild(pdfWrapper);
+                document.body.appendChild(overlay);
+            } else {
+                overlay.appendChild(pdfWrapper);
+            }
+
             window.scrollTo(0, 0);
 
             if (showLh && lhImgSrc) {
+                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                pages.forEach(pEl => {
+                    let bgImg = pEl.querySelector('img');
+                    if (bgImg) {
+                        let actualH = Math.max(pEl.scrollHeight, pEl.offsetHeight, PAGE_H_PX);
+                        bgImg.style.height = actualH + 'px';
+                    }
+                });
                 let allBgImgs = Array.from(pdfWrapper.querySelectorAll('img'));
                 await Promise.all(allBgImgs.map(waitForImageReady));
+                overlay.style.opacity = '1';
             }
 
             let opt = {
