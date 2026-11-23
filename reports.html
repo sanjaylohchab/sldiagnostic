@@ -714,14 +714,7 @@
                     let dbTest = fullDatabase.tests.find(t => t.name.replace(/\*/g, '').trim().toUpperCase() === cleanTName.toUpperCase());
                     let params = dbTest && dbTest.parameters ? dbTest.parameters : [{name: cleanTName, unit: "-", range: "-"}];
                     
-                    let isExclusive = tName.includes('*') || (dbTest && dbTest.name.includes('*'));
-                    
                     let tableStyle = 'width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 12px;';
-                    
-                    if (isExclusive) {
-                        if (index !== 0) tableStyle += ' page-break-before: always; break-before: page;';
-                        tableStyle += ' page-break-after: always; break-after: page;';
-                    }
 
                     finalHtml += `<table class="rep-main-table" style="${tableStyle}">`;
                     finalHtml += `<thead><tr><th width="40%" style="border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 6px 8px; text-align: left; background-color: #f9f9f9 !important; font-size: 13px;">Test Name</th><th width="20%" style="border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 6px 8px; text-align: left; background-color: #f9f9f9 !important; font-size: 13px;">Result</th><th width="15%" style="border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 6px 8px; text-align: left; background-color: #f9f9f9 !important; font-size: 13px;">Unit</th><th width="25%" style="border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 6px 8px; text-align: left; background-color: #f9f9f9 !important; font-size: 13px;">Ref Range</th></tr></thead><tbody>`;
@@ -870,7 +863,7 @@
             });
         }
 
-        // 🔥 BLANK-PAGE-FREE & FULL-CONTENT A4 PAGINATED PDF ENGINE
+        // 🔥 DIRECT JSPDF SLICER: Captures full report without blank pages or missing tests, repeats letterhead on every A4 page
         async function downloadMobilePDF() {
             let auditPatient = fullDatabase.patients && fullDatabase.patients[printingPtIndex];
             if (auditPatient) recordAudit(`Downloaded PDF report for ${auditPatient.name || 'patient'}`, 'report');
@@ -914,23 +907,23 @@
                 : '⏳ Generating Perfect PDF... Please wait.';
             overlay.appendChild(loadMsg);
 
+            const A4_W_MM = 210;
+            const A4_H_MM = 297;
             const PAGE_W_PX = 794;
-            const PAGE_H_PX = 1123;
-            const MM_TO_PX = PAGE_W_PX / 210;
+            const MM_TO_PX = PAGE_W_PX / A4_W_MM;
             const sidePadPx = Math.round(10 * MM_TO_PX);
-            const topPadPx = Math.round(tMargin * MM_TO_PX);
-            const botPadPx = Math.round(bMargin * MM_TO_PX);
-            const usableHeightPx = Math.max(420, PAGE_H_PX - topPadPx - botPadPx);
+            const usableHeightMm = Math.max(80, A4_H_MM - tMargin - bMargin);
 
-            let measureContainer = document.createElement('div');
-            measureContainer.style.position = 'absolute';
-            measureContainer.style.left = '-9999px';
-            measureContainer.style.top = '0';
-            measureContainer.style.width = (PAGE_W_PX - sidePadPx * 2) + 'px';
-            measureContainer.style.backgroundColor = '#ffffff';
-            measureContainer.style.color = '#000000';
-            measureContainer.style.fontFamily = "'Poppins', sans-serif";
-            document.body.appendChild(measureContainer);
+            // Single continuous content box so no test or row is clipped or triggers blank pages
+            let contentBox = document.createElement('div');
+            contentBox.id = 'pdfGenWrapper';
+            contentBox.style.width = PAGE_W_PX + 'px';
+            contentBox.style.margin = '0 auto';
+            contentBox.style.padding = `8px ${sidePadPx}px`;
+            contentBox.style.backgroundColor = '#ffffff';
+            contentBox.style.color = '#000000';
+            contentBox.style.boxSizing = 'border-box';
+            contentBox.style.fontFamily = "'Poppins', sans-serif";
 
             let contentNode = document.getElementById('printContentWrapper').cloneNode(true);
             contentNode.style.display = 'block';
@@ -940,235 +933,80 @@
                 clonedTextHeader.style.display = showTextHeader ? 'flex' : 'none';
             }
 
-            // Collect blocks so all selected tests & notes are preserved without dropping any test
-            let blocks = [];
-            const headerEl = contentNode.querySelector('#prTextHeader');
-            if (headerEl && headerEl.style.display !== 'none') blocks.push(headerEl.cloneNode(true));
-
-            const infoTable = contentNode.querySelector('.rep-info-table');
-            if (infoTable) blocks.push(infoTable.cloneNode(true));
-
-            const dynArea = contentNode.querySelector('#sl-dynamic-report');
-            if (dynArea) {
-                Array.from(dynArea.children).forEach(child => {
-                    if (child.tagName === 'TABLE' && child.classList.contains('rep-main-table')) {
-                        // Keep test header + individual rows together so no test gets skipped
-                        let thead = child.querySelector('thead');
-                        let tbody = child.querySelector('tbody');
-                        let rows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
-                        if (rows.length > 0) {
-                            let group = [];
-                            rows.forEach((tr) => {
-                                let isCatTitle = !!tr.querySelector('.test-category-title');
-                                if (isCatTitle && group.length > 0) {
-                                    blocks.push({ type: 'tableGroup', theadHtml: thead ? thead.outerHTML : '', rows: group, style: child.getAttribute('style') || '' });
-                                    group = [tr.outerHTML];
-                                } else {
-                                    group.push(tr.outerHTML);
-                                }
-                            });
-                            if (group.length > 0) {
-                                blocks.push({ type: 'tableGroup', theadHtml: thead ? thead.outerHTML : '', rows: group, style: child.getAttribute('style') || '' });
-                            }
-                        } else {
-                            blocks.push({ type: 'element', el: child.cloneNode(true) });
-                        }
-                    } else if (child.classList && child.classList.contains('clinical-note-box')) {
-                        let lines = child.querySelectorAll('.clinical-note-line');
-                        if (lines.length > 0) {
-                            lines.forEach((lineEl, lIdx) => {
-                                let lineWrapper = document.createElement('div');
-                                lineWrapper.style.fontSize = '11px';
-                                lineWrapper.style.lineHeight = '1.45';
-                                lineWrapper.style.color = '#1E293B';
-                                lineWrapper.style.padding = '0 8px';
-                                if (lIdx === 0) {
-                                    lineWrapper.style.borderTop = '1px solid #CBD5E1';
-                                    lineWrapper.style.paddingTop = '6px';
-                                }
-                                lineWrapper.appendChild(lineEl.cloneNode(true));
-                                blocks.push({ type: 'element', el: lineWrapper });
-                            });
-                        } else {
-                            blocks.push({ type: 'element', el: child.cloneNode(true) });
-                        }
-                    } else {
-                        blocks.push({ type: 'element', el: child.cloneNode(true) });
-                    }
-                });
-            }
-
-            function buildTableElement(groupObj, sliceRows) {
-                let tbl = document.createElement('table');
-                tbl.className = 'rep-main-table';
-                tbl.setAttribute('style', (groupObj.style || 'width:100%; border-collapse:collapse; margin-bottom:10px; font-size:12px;'));
-                tbl.innerHTML = `${groupObj.theadHtml || ''}<tbody>${sliceRows.join('')}</tbody>`;
-                return tbl;
-            }
-
-            function createPageElement() {
-                let pageEl = document.createElement('div');
-                pageEl.style.width = PAGE_W_PX + 'px';
-                pageEl.style.minHeight = PAGE_H_PX + 'px';
-                pageEl.style.position = 'relative';
-                pageEl.style.backgroundColor = '#ffffff';
-                pageEl.style.color = '#000000';
-                pageEl.style.boxSizing = 'border-box';
-                pageEl.style.pageBreakAfter = 'always';
-                pageEl.style.breakAfter = 'page';
-
-                if (showLh && lhImgSrc) {
-                    let bgImg = document.createElement('img');
-                    bgImg.src = lhImgSrc;
-                    bgImg.style.position = 'absolute';
-                    bgImg.style.top = '0';
-                    bgImg.style.left = '0';
-                    bgImg.style.width = PAGE_W_PX + 'px';
-                    bgImg.style.height = PAGE_H_PX + 'px';
-                    bgImg.style.objectFit = 'cover';
-                    bgImg.style.zIndex = '0';
-                    bgImg.style.pointerEvents = 'none';
-                    pageEl.appendChild(bgImg);
-                }
-
-                let innerArea = document.createElement('div');
-                innerArea.style.position = 'relative';
-                innerArea.style.zIndex = '1';
-                innerArea.style.paddingTop = topPadPx + 'px';
-                innerArea.style.paddingBottom = botPadPx + 'px';
-                innerArea.style.paddingLeft = sidePadPx + 'px';
-                innerArea.style.paddingRight = sidePadPx + 'px';
-                innerArea.style.boxSizing = 'border-box';
-
-                pageEl.appendChild(innerArea);
-                return { pageEl, innerArea };
-            }
-
-            function measureHeight(node) {
-                measureContainer.innerHTML = '';
-                measureContainer.appendChild(node);
-                return Math.ceil(node.getBoundingClientRect().height || node.offsetHeight || 20);
-            }
-
-            let pages = [];
-            let current = createPageElement();
-            let currentUsedHeight = 0;
-
-            for (let i = 0; i < blocks.length; i++) {
-                let item = blocks[i];
-
-                if (item.type === 'tableGroup') {
-                    // Split table rows across pages cleanly so every test and every row appears without blank pages
-                    let pendingRows = [...item.rows];
-                    while (pendingRows.length > 0) {
-                        let remaining = usableHeightPx - currentUsedHeight;
-                        let testSample = buildTableElement(item, [pendingRows[0]]);
-                        let firstRowH = measureHeight(testSample);
-
-                        if (currentUsedHeight > 0 && remaining < firstRowH) {
-                            pages.push(current.pageEl);
-                            current = createPageElement();
-                            currentUsedHeight = 0;
-                            remaining = usableHeightPx;
-                        }
-
-                        let fitRows = [];
-                        for (let r = 0; r < pendingRows.length; r++) {
-                            let candidateRows = [...fitRows, pendingRows[r]];
-                            let candidateTbl = buildTableElement(item, candidateRows);
-                            let h = measureHeight(candidateTbl);
-                            if (h <= remaining || fitRows.length === 0) {
-                                fitRows = candidateRows;
-                            } else {
-                                break;
-                            }
-                        }
-
-                        let placedTbl = buildTableElement(item, fitRows);
-                        let placedH = measureHeight(placedTbl);
-                        current.innerArea.appendChild(placedTbl);
-                        currentUsedHeight += placedH;
-                        pendingRows = pendingRows.slice(fitRows.length);
-
-                        if (pendingRows.length > 0) {
-                            pages.push(current.pageEl);
-                            current = createPageElement();
-                            currentUsedHeight = 0;
-                        }
-                    }
-                } else {
-                    let blk = item.el;
-                    let blkHeight = measureHeight(blk.cloneNode(true));
-
-                    if (currentUsedHeight > 0 && (currentUsedHeight + blkHeight) > usableHeightPx) {
-                        pages.push(current.pageEl);
-                        current = createPageElement();
-                        currentUsedHeight = 0;
-                    }
-
-                    current.innerArea.appendChild(blk);
-                    currentUsedHeight += blkHeight;
-                }
-            }
-
-            // Push final page only if it has content (prevents trailing blank pages)
-            if (current.innerArea.children.length > 0 || pages.length === 0) {
-                pages.push(current.pageEl);
-            }
-
-            // Ensure each page's letterhead image matches that page's actual rendered height
-            if (showLh && lhImgSrc) {
-                overlay.style.opacity = '0';
-                document.body.appendChild(overlay);
-            }
-
-            if (pages.length > 0) {
-                pages[pages.length - 1].style.pageBreakAfter = 'auto';
-                pages[pages.length - 1].style.breakAfter = 'auto';
-            }
-
-            document.body.removeChild(measureContainer);
-
-            let pdfWrapper = document.createElement('div');
-            pdfWrapper.id = 'pdfGenWrapper';
-            pdfWrapper.style.width = PAGE_W_PX + 'px';
-            pdfWrapper.style.margin = '0 auto';
-            pages.forEach(pEl => pdfWrapper.appendChild(pEl));
-
-            if (!document.body.contains(overlay)) {
-                overlay.appendChild(pdfWrapper);
-                document.body.appendChild(overlay);
-            } else {
-                overlay.appendChild(pdfWrapper);
-            }
+            contentBox.appendChild(contentNode);
+            overlay.appendChild(contentBox);
+            document.body.appendChild(overlay);
 
             window.scrollTo(0, 0);
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
+            let lhImgObj = null;
+            let lhFormat = 'JPEG';
             if (showLh && lhImgSrc) {
-                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-                pages.forEach(pEl => {
-                    let bgImg = pEl.querySelector('img');
-                    if (bgImg) {
-                        let actualH = Math.max(pEl.scrollHeight, pEl.offsetHeight, PAGE_H_PX);
-                        bgImg.style.height = actualH + 'px';
-                    }
-                });
-                let allBgImgs = Array.from(pdfWrapper.querySelectorAll('img'));
-                await Promise.all(allBgImgs.map(waitForImageReady));
-                overlay.style.opacity = '1';
+                if (lhImgSrc.startsWith('data:image/png') || lhImgSrc.toLowerCase().includes('.png')) {
+                    lhFormat = 'PNG';
+                }
+                lhImgObj = new Image();
+                lhImgObj.src = lhImgSrc;
+                await waitForImageReady(lhImgObj);
             }
 
-            let opt = {
-                margin:       0,
-                filename:     pName + '_Lab_Report.pdf',
-                image:        { type: 'jpeg', quality: onPhone ? 0.85 : 1 },
-                html2canvas:  { scale: onPhone ? 1.25 : 2, useCORS: true, allowTaint: true, scrollY: 0, logging: false },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-                pagebreak:    { mode: ['css', 'legacy'] }
-            };
+            const renderScale = onPhone ? 1.3 : 1.8;
 
             try {
-                await html2pdf().set(opt).from(pdfWrapper).save();
+                const worker = html2pdf().set({
+                    margin: 0,
+                    filename: pName + '_Lab_Report.pdf',
+                    image: { type: 'jpeg', quality: onPhone ? 0.88 : 0.96 },
+                    html2canvas: {
+                        scale: renderScale,
+                        useCORS: true,
+                        scrollY: 0,
+                        backgroundColor: '#ffffff',
+                        logging: false
+                    },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                });
+
+                const canvas = await worker.from(contentBox).toCanvas().get('canvas');
+                const pdf = await worker.toPdf().get('pdf');
+
+                // Calculate exact pixel height per usable A4 page
+                const pxPerMm = canvas.width / A4_W_MM;
+                const sliceHeightPx = Math.max(100, Math.round(usableHeightMm * pxPerMm));
+                const totalContentPx = canvas.height;
+                const pageCount = Math.max(1, Math.ceil(totalContentPx / sliceHeightPx));
+
+                for (let pIdx = 0; pIdx < pageCount; pIdx++) {
+                    if (pIdx > 0) {
+                        pdf.addPage();
+                    }
+
+                    if (showLh && lhImgObj && lhImgObj.complete && lhImgObj.naturalWidth > 0) {
+                        pdf.addImage(lhImgObj, lhFormat, 0, 0, A4_W_MM, A4_H_MM, undefined, 'FAST');
+                    }
+
+                    let srcY = pIdx * sliceHeightPx;
+                    let currentSlicePx = Math.min(sliceHeightPx, totalContentPx - srcY);
+                    if (currentSlicePx > 0) {
+                        let pageSliceCanvas = document.createElement('canvas');
+                        pageSliceCanvas.width = canvas.width;
+                        pageSliceCanvas.height = currentSlicePx;
+                        let sCtx = pageSliceCanvas.getContext('2d');
+                        sCtx.fillStyle = '#ffffff';
+                        sCtx.fillRect(0, 0, pageSliceCanvas.width, pageSliceCanvas.height);
+                        sCtx.drawImage(
+                            canvas,
+                            0, srcY, canvas.width, currentSlicePx,
+                            0, 0, canvas.width, currentSlicePx
+                        );
+                        const sliceDataUrl = pageSliceCanvas.toDataURL('image/jpeg', onPhone ? 0.88 : 0.96);
+                        const sliceHeightMm = currentSlicePx / pxPerMm;
+                        pdf.addImage(sliceDataUrl, 'JPEG', 0, tMargin, A4_W_MM, sliceHeightMm, undefined, 'FAST');
+                    }
+                }
+
+                pdf.save(pName + '_Lab_Report.pdf');
                 if (document.body.contains(overlay)) document.body.removeChild(overlay);
                 alert("✅ PDF Downloaded Successfully!");
             } catch (err) {
