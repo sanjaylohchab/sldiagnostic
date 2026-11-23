@@ -123,11 +123,13 @@
         }
 
         .clinical-note-box {
-            padding: 10px 8px;
+            padding: 8px 8px;
             border-top: 1px solid #CBD5E1;
             font-size: 11px;
             line-height: 1.45;
             color: #1E293B;
+        }
+        .clinical-note-line {
             break-inside: avoid;
             page-break-inside: avoid;
         }
@@ -583,17 +585,17 @@
                     if (!inTable) {
                         inTable = true;
                         html += `<table style="width:100%; max-width:520px; border-collapse:collapse; margin:6px 0 10px 0; font-size:11px; border:1px solid #000;">`;
-                        html += `<tr style="background:#F1F5F9; font-weight:bold;">` + cells.map(c => `<td style="border:1px solid #000; padding:4px 6px;">${c}</td>`).join('') + `</tr>`;
+                        html += `<tr class="clinical-note-line" style="background:#F1F5F9; font-weight:bold;">` + cells.map(c => `<td style="border:1px solid #000; padding:4px 6px;">${c}</td>`).join('') + `</tr>`;
                     } else {
-                        html += `<tr>` + cells.map(c => `<td style="border:1px solid #000; padding:4px 6px;">${c}</td>`).join('') + `</tr>`;
+                        html += `<tr class="clinical-note-line">` + cells.map(c => `<td style="border:1px solid #000; padding:4px 6px;">${c}</td>`).join('') + `</tr>`;
                     }
                 } else {
                     if (inTable) { html += `</table>`; inTable = false; }
                     if (trimmed === '') {
-                        html += `<div style="height:6px;"></div>`;
+                        html += `<div class="clinical-note-line" style="height:6px;"></div>`;
                     } else {
                         let formatted = trimmed.replace(/^(Reference Range|Clinical Significance|Method|Note|Interpretation|Remark)(:?)/i, '<b>$1$2</b>');
-                        html += `<div style="margin-bottom:2px; text-align:justify;">${formatted}</div>`;
+                        html += `<div class="clinical-note-line" style="margin-bottom:2px; text-align:justify;">${formatted}</div>`;
                     }
                 }
             });
@@ -654,7 +656,7 @@
                     
                     let isExclusive = tName.includes('*') || (dbTest && dbTest.name.includes('*'));
                     
-                    let tableStyle = 'width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 12px;';
+                    let tableStyle = 'width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 12px;';
                     
                     if (isExclusive) {
                         if (index !== 0) tableStyle += ' page-break-before: always; break-before: page;';
@@ -757,13 +759,13 @@
 
                     finalHtml += `</tbody></table>`;
 
-                    // 🔥 CLINICAL NOTE / COMMENT: Kept clean & intact so large notes break cleanly onto next page with letterhead
+                    // 🔥 CLINICAL NOTE / COMMENT: Flows naturally across pages without blocking header/footer
                     if (dbTest && dbTest.clinical_note && dbTest.clinical_note.trim() !== '') {
                         finalHtml += `<div class="clinical-note-box">${formatClinicalNote(dbTest.clinical_note)}</div>`;
                     }
                     
                     if (index === totalTests - 1) {
-                        finalHtml += `<div style="text-align: center; padding-top: 24px; padding-bottom: 10px; font-weight: bold; font-size: 12px; color: #333; break-inside: avoid; page-break-inside: avoid;">*** End of Report ***</div>`;
+                        finalHtml += `<div style="text-align: center; padding-top: 20px; padding-bottom: 10px; font-weight: bold; font-size: 12px; color: #333; break-inside: avoid; page-break-inside: avoid;">*** End of Report ***</div>`;
                     }
                 });
             }
@@ -809,7 +811,7 @@
             });
         }
 
-        // 🔥 MULTI-PAGE LETTERHEAD + CLEAN COMMENT PAGE-BREAK PDF ENGINE
+        // 🔥 SAFE PAGE-BY-PAGE LETTERHEAD + TOP/BOTTOM MARGIN PDF COMPOSITOR
         async function downloadMobilePDF() {
             let auditPatient = fullDatabase.patients && fullDatabase.patients[printingPtIndex];
             if (auditPatient) recordAudit(`Downloaded PDF report for ${auditPatient.name || 'patient'}`, 'report');
@@ -853,84 +855,122 @@
                 : '⏳ Generating Perfect PDF... Please wait.';
             overlay.appendChild(loadMsg);
 
-            const A4_HEIGHT_PX = 1123;
-            let pdfWrapper = document.createElement('div');
-            pdfWrapper.id = 'pdfGenWrapper';
-            pdfWrapper.style.width = '794px';
-            pdfWrapper.style.minHeight = A4_HEIGHT_PX + 'px';
-            pdfWrapper.style.margin = '0 auto';
-            pdfWrapper.style.backgroundColor = '#ffffff';
-            pdfWrapper.style.color = '#000000';
-            pdfWrapper.style.position = 'relative';
-            pdfWrapper.style.overflow = 'hidden';
+            // Convert mm to px on 794px A4 width (210mm = 794px -> ~3.7795px per mm)
+            const MM_TO_PX = 794 / 210;
+            const PAGE_W_PX = 794;
+            const PAGE_H_PX = 1123;
+            const sidePadPx = Math.round(10 * MM_TO_PX);
+            const topPadPx = Math.round(tMargin * MM_TO_PX);
+            const botPadPx = Math.round(bMargin * MM_TO_PX);
+            const usablePageHeightPx = Math.max(400, PAGE_H_PX - topPadPx - botPadPx);
 
-            let bgLayer = document.createElement('div');
-            bgLayer.style.position = 'absolute';
-            bgLayer.style.top = '0';
-            bgLayer.style.left = '0';
-            bgLayer.style.width = '794px';
-            bgLayer.style.height = '100%';
-            bgLayer.style.zIndex = '0';
-            bgLayer.style.pointerEvents = 'none';
-            pdfWrapper.appendChild(bgLayer);
+            // Render content stream without top/bottom page spacer cells so we slice cleanly per page
+            let sourceWrapper = document.createElement('div');
+            sourceWrapper.style.width = PAGE_W_PX + 'px';
+            sourceWrapper.style.backgroundColor = '#ffffff';
+            sourceWrapper.style.color = '#000000';
+            sourceWrapper.style.boxSizing = 'border-box';
+            sourceWrapper.style.padding = `0 ${sidePadPx}px`;
 
             let contentNode = document.getElementById('printContentWrapper').cloneNode(true);
             contentNode.style.display = 'block';
-            contentNode.style.position = 'relative';
-            contentNode.style.zIndex = '1';
-            contentNode.style.paddingTop = tMargin + 'mm';
-            contentNode.style.paddingBottom = bMargin + 'mm';
-            contentNode.style.paddingLeft = '10mm';
-            contentNode.style.paddingRight = '10mm';
+            contentNode.style.padding = '0';
             contentNode.style.boxSizing = 'border-box';
-            
             let clonedTextHeader = contentNode.querySelector('#prTextHeader');
             if (clonedTextHeader) {
                 clonedTextHeader.style.display = showTextHeader ? 'flex' : 'none';
             }
-
-            pdfWrapper.appendChild(contentNode);
-            overlay.appendChild(pdfWrapper);
+            sourceWrapper.appendChild(contentNode);
+            overlay.appendChild(sourceWrapper);
             document.body.appendChild(overlay);
 
-            overlay.scrollTop = 0;
             window.scrollTo(0, 0);
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
-            // Repeat letterhead on every A4 page height so page 2 & 3 also get letterhead
-            let pageImages = [];
+            let lhImgObj = null;
             if (showLh && lhImgSrc) {
-                await new Promise(resolve => {
-                    requestAnimationFrame(() => requestAnimationFrame(resolve));
-                });
-                const totalHeight = Math.max(pdfWrapper.scrollHeight, A4_HEIGHT_PX);
-                const pageCount = Math.max(1, Math.ceil(totalHeight / A4_HEIGHT_PX));
-                for (let pIdx = 0; pIdx < pageCount; pIdx++) {
-                    let pageBg = document.createElement('img');
-                    pageBg.src = lhImgSrc;
-                    pageBg.style.position = 'absolute';
-                    pageBg.style.top = (pIdx * A4_HEIGHT_PX) + 'px';
-                    pageBg.style.left = '0';
-                    pageBg.style.width = '794px';
-                    pageBg.style.height = A4_HEIGHT_PX + 'px';
-                    pageBg.style.objectFit = 'cover';
-                    pageBg.style.pointerEvents = 'none';
-                    bgLayer.appendChild(pageBg);
-                    pageImages.push(pageBg);
-                }
-                await Promise.all(pageImages.map(waitForImageReady));
+                lhImgObj = new Image();
+                lhImgObj.crossOrigin = 'anonymous';
+                lhImgObj.src = lhImgSrc;
+                await waitForImageReady(lhImgObj);
             }
 
-            let opt = {
-                margin:       0,
-                filename:     pName + '_Lab_Report.pdf',
-                image:        { type: 'jpeg', quality: onPhone ? 0.8 : 1 },
-                html2canvas:  { scale: onPhone ? 1.2 : 2, useCORS: true, allowTaint: true, scrollY: 0, logging: false },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-                pagebreak:    { mode: ['css', 'legacy'] }
-            };
+            const renderScale = onPhone ? 1.2 : 2;
 
             try {
-                await html2pdf().set(opt).from(pdfWrapper).save();
+                if (typeof html2canvas === 'undefined') {
+                    throw new Error('html2canvas not available');
+                }
+
+                const contentCanvas = await html2canvas(sourceWrapper, {
+                    scale: renderScale,
+                    useCORS: true,
+                    allowTaint: true,
+                    scrollY: 0,
+                    backgroundColor: '#ffffff',
+                    logging: false
+                });
+
+                const scaledPageW = Math.round(PAGE_W_PX * renderScale);
+                const scaledPageH = Math.round(PAGE_H_PX * renderScale);
+                const scaledTop = Math.round(topPadPx * renderScale);
+                const scaledUsableH = Math.round(usablePageHeightPx * renderScale);
+
+                const totalContentH = contentCanvas.height;
+                const totalPages = Math.max(1, Math.ceil(totalContentH / scaledUsableH));
+
+                // Build multi-page container where each A4 page has its own letterhead + top/bottom margins
+                let multiPageContainer = document.createElement('div');
+                multiPageContainer.id = 'pdfGenWrapper';
+                multiPageContainer.style.width = PAGE_W_PX + 'px';
+                multiPageContainer.style.margin = '0 auto';
+                multiPageContainer.style.backgroundColor = '#ffffff';
+
+                for (let pageIndex = 0; pageIndex < totalPages; pageIndex++) {
+                    let pageCanvas = document.createElement('canvas');
+                    pageCanvas.width = scaledPageW;
+                    pageCanvas.height = scaledPageH;
+                    let ctx = pageCanvas.getContext('2d');
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, scaledPageW, scaledPageH);
+
+                    if (showLh && lhImgObj && lhImgObj.complete && lhImgObj.naturalWidth > 0) {
+                        ctx.drawImage(lhImgObj, 0, 0, scaledPageW, scaledPageH);
+                    }
+
+                    let srcY = pageIndex * scaledUsableH;
+                    let sliceH = Math.min(scaledUsableH, totalContentH - srcY);
+                    if (sliceH > 0) {
+                        ctx.drawImage(
+                            contentCanvas,
+                            0, srcY, scaledPageW, sliceH,
+                            0, scaledTop, scaledPageW, sliceH
+                        );
+                    }
+
+                    let pageImg = document.createElement('img');
+                    pageImg.src = pageCanvas.toDataURL('image/jpeg', onPhone ? 0.85 : 0.95);
+                    pageImg.style.width = PAGE_W_PX + 'px';
+                    pageImg.style.height = PAGE_H_PX + 'px';
+                    pageImg.style.display = 'block';
+                    multiPageContainer.appendChild(pageImg);
+                }
+
+                sourceWrapper.remove();
+                overlay.appendChild(multiPageContainer);
+                await Promise.all(Array.from(multiPageContainer.querySelectorAll('img')).map(waitForImageReady));
+
+                let opt = {
+                    margin:       0,
+                    filename:     pName + '_Lab_Report.pdf',
+                    image:        { type: 'jpeg', quality: onPhone ? 0.85 : 1 },
+                    html2canvas:  { scale: 1, useCORS: true, allowTaint: true, scrollY: 0, logging: false },
+                    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                    pagebreak:    { mode: ['css', 'legacy'] }
+                };
+
+                await html2pdf().set(opt).from(multiPageContainer).save();
                 if (document.body.contains(overlay)) document.body.removeChild(overlay);
                 alert("✅ PDF Downloaded Successfully!");
             } catch (err) {
