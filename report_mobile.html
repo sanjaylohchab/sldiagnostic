@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobile PDF Report</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body { font-family: 'Poppins', sans-serif; background: #F1F5F9; margin: 0; padding: 14px; color: #1E293B; }
+        .top-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #0F172A; color: #fff; padding: 12px 14px; border-radius: 12px; margin-bottom: 14px; }
+        .top-bar a { color: #fff; text-decoration: none; font-size: 13px; background: rgba(255,255,255,0.14); padding: 6px 12px; border-radius: 8px; }
+        .btn-dl { background: #8B5CF6; color: #fff; border: none; padding: 12px 16px; border-radius: 10px; font-weight: 700; font-size: 14px; width: 100%; cursor: pointer; margin-bottom: 14px; }
+        #statusMsg { text-align: center; font-size: 13px; font-weight: 600; color: #2563EB; margin-bottom: 12px; }
+        #pdfStageWrap { width: 100%; overflow-x: auto; }
+        .fallback-header { display: flex; align-items: center; border-bottom: 3px solid #F57C00; padding-bottom: 8px; margin-bottom: 10px; }
+        .fallback-header h1 { margin: 0; color: #000080; font-size: 20px; }
+        .rep-info-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; border: 2px solid #000; }
+        .rep-info-table td.box-cell { padding: 12px 15px; vertical-align: top; border: 1px solid #000; }
+        .inner-info { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.6; }
+        .inner-info td { border: none !important; padding: 2px 0; }
+        .inner-lbl { width: 110px; font-weight: bold; }
+        .inner-colon { width: 15px; font-weight: bold; }
+        .rep-main-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 12px; }
+        .rep-main-table th { border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 6px 8px; text-align: left; background-color: #f9f9f9; font-size: 13px; }
+        .rep-main-table td { padding: 5px 8px; line-height: 1.4; }
+        .abnormal-print { color: #DC2626; font-weight: 900; }
+        .test-category-title {
+            text-align: center;
+            background-color: #E2E8F0;
+            color: #1E293B;
+            font-weight: 800;
+            font-size: 15px;
+            padding: 10px;
+            text-transform: uppercase;
+            border: 1px solid #CBD5E1;
+            border-left: none;
+            border-right: none;
+        }
+        .clinical-note-box { padding: 8px; border-top: 1px solid #CBD5E1; font-size: 11px; line-height: 1.45; color: #1E293B; }
+        .report-sign-footer-block { margin-top: 24px; padding-top: 8px; }
+        .sign-row-table { width: 100%; border-collapse: collapse; margin-top: 22px; font-size: 11px; color: #111827; }
+        .sign-cell-left { width: 50%; text-align: left; vertical-align: bottom; padding-right: 12px; }
+        .sign-cell-right { width: 50%; text-align: right; vertical-align: bottom; padding-left: 12px; }
+        .sign-line-box { display: inline-block; min-width: 190px; border-top: 1px solid #111827; padding-top: 5px; font-weight: 700; }
+        .end-of-report-center { text-align: center; padding-top: 18px; padding-bottom: 8px; font-weight: bold; font-size: 12px; color: #333; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <a href="report.html">← Back</a>
+        <span style="font-size:14px; font-weight:700;">Mobile PDF Downloader</span>
+        <span></span>
+    </div>
+
+    <button class="btn-dl" onclick="downloadPdfNow()">📥 Download as PDF (Mobile)</button>
+    <div id="statusMsg">⏳ Loading report data...</div>
+
+    <div id="pdfStageWrap">
+        <div id="mobilePdfPagesContainer"></div>
+    </div>
+
+    <script>
+        const dbUrl = "https://diagnostic-center-74aa4-default-rtdb.firebaseio.com/lab_data.json";
+        let fullDatabase = {};
+        let reportFileName = "Patient_Lab_Report.pdf";
+
+        function safeKey(key) {
+            if (!key) return "unknown";
+            return String(key).replace(/[.#$\[\]\/]/g, '_');
+        }
+
+        function getSavedIncludeNote(p, sTName, legacySTName) {
+            if (p && p.test_results && p.test_results[sTName] && p.test_results[sTName]._include_note !== undefined) {
+                return !!p.test_results[sTName]._include_note;
+            }
+            if (p && p.test_results && legacySTName && p.test_results[legacySTName] && p.test_results[legacySTName]._include_note !== undefined) {
+                return !!p.test_results[legacySTName]._include_note;
+            }
+            return false;
+        }
+
+        function formatClinicalNote(text) {
+            if (!text) return '';
+            let lines = text.split('\n');
+            let html = '';
+            let inTable = false;
+            lines.forEach(line => {
+                let trimmed = line.trim();
+                if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+                    let cells = trimmed.slice(1, -1).split('|').map(c => c.trim());
+                    if (!inTable) {
+                        inTable = true;
+                        html += `<table style="width:100%; max-width:520px; border-collapse:collapse; margin:6px 0 10px 0; font-size:11px; border:1px solid #000;">`;
+                        html += `<tr style="background:#F1F5F9; font-weight:bold;">` + cells.map(c => `<td style="border:1px solid #000; padding:4px 6px;">${c}</td>`).join('') + `</tr>`;
+                    } else {
+                        html += `<tr>` + cells.map(c => `<td style="border:1px solid #000; padding:4px 6px;">${c}</td>`).join('') + `</tr>`;
+                    }
+                } else {
+                    if (inTable) { html += `</table>`; inTable = false; }
+                    if (trimmed === '') {
+                        html += `<div style="height:6px;"></div>`;
+                    } else {
+                        let formatted = trimmed.replace(/^(Reference Range|Clinical Significance|Method|Note|Interpretation|Remark)(:?)/i, '<b>$1$2</b>');
+                        html += `<div style="margin-bottom:2px; text-align:justify;">${formatted}</div>`;
+                    }
+                }
+            });
+            if (inTable) html += `</table>`;
+            return html;
+        }
+
+        function buildEndSignFooterHtml() {
+            return `
+                <div class="report-sign-footer-block">
+                    <table class="sign-row-table">
+                        <tr>
+                            <td class="sign-cell-left"><span class="sign-line-box">LABORATORY INCHARGE SIGNATURE</span></td>
+                            <td class="sign-cell-right"><span class="sign-line-box">Dr. Signature</span></td>
+                        </tr>
+                    </table>
+                    <div class="end-of-report-center">*** End of Report ***</div>
+                </div>
+            `;
+        }
+
+        function waitForImg(imgEl) {
+            return new Promise(resolve => {
+                if (!imgEl || !imgEl.src) return resolve();
+                if (imgEl.complete && imgEl.naturalWidth > 0) return resolve();
+                imgEl.onload = () => resolve();
+                imgEl.onerror = () => resolve();
+                setTimeout(resolve, 4000);
+            });
+        }
+
+        async function buildMobilePages() {
+            const params = new URLSearchParams(window.location.search);
+            const ptIdx = parseInt(params.get('pt_idx'), 10);
+            const lhParam = params.get('lh') || '';
+            const tMargin = parseInt(params.get('top'), 10) || 45;
+            const bMargin = parseInt(params.get('bot'), 10) || 30;
+            const repDateParam = params.get('rep_date') || '';
+
+            const res = await fetch(`${dbUrl}?nocache=${Date.now()}`, { cache: 'no-store' });
+            fullDatabase = await res.json() || {};
+            const p = (fullDatabase.patients || [])[ptIdx];
+            if (!p) {
+                document.getElementById('statusMsg').innerText = "Patient record not found.";
+                return;
+            }
+
+            reportFileName = ((p.name || 'Patient_Report').replace(/[^a-zA-Z0-9_-]/g, '_')) + '_Lab_Report.pdf';
+
+            let lhImgSrc = null;
+            if (lhParam === 'settings_lh' && fullDatabase.letterhead_image) {
+                lhImgSrc = fullDatabase.letterhead_image;
+            } else if (lhParam !== '' && fullDatabase.letterheads && fullDatabase.letterheads[lhParam]) {
+                lhImgSrc = fullDatabase.letterheads[lhParam].img;
+            } else if (fullDatabase.letterheads && fullDatabase.letterheads.length > 0) {
+                lhImgSrc = fullDatabase.letterheads[0].img;
+            } else if (fullDatabase.letterhead_image) {
+                lhImgSrc = fullDatabase.letterhead_image;
+            }
+
+            let repDateText = p.date || '';
+            if (repDateParam) {
+                const dp = repDateParam.split('-');
+                if (dp.length === 3) repDateText = `${dp[2]}-${dp[1]}-${dp[0]}`;
+            }
+
+            let bodyHtml = `
+                ${lhImgSrc ? '' : `<div class="fallback-header"><div><h1>${(fullDatabase.lab_name || 'SL DIAGNOSTIC CENTER').toUpperCase()}</h1></div></div>`}
+                <table class="rep-info-table">
+                    <tr>
+                        <td width="50%" class="box-cell">
+                            <table class="inner-info">
+                                <tr><td class="inner-lbl">Patient Name</td><td class="inner-colon">:</td><td><b>${(p.name || '-').toUpperCase()}</b></td></tr>
+                                <tr><td class="inner-lbl">Age / Sex</td><td class="inner-colon">:</td><td>${p.age || '-'} Y / ${p.gender || '-'}</td></tr>
+                                <tr><td class="inner-lbl">Referred By</td><td class="inner-colon">:</td><td>${p.doctor || 'Self'}</td></tr>
+                            </table>
+                        </td>
+                        <td width="50%" class="box-cell">
+                            <table class="inner-info">
+                                <tr><td class="inner-lbl" style="width:130px;">Report Lab ID</td><td class="inner-colon">:</td><td><b>${p.lab_no || 'N/A'}</b></td></tr>
+                                <tr><td class="inner-lbl">Sample Date</td><td class="inner-colon">:</td><td>${p.date || ''}</td></tr>
+                                <tr><td class="inner-lbl">Report Date</td><td class="inner-colon">:</td><td>${repDateText}</td></tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            `;
+
+            const selTests = p.selected_tests || [];
+            selTests.forEach((tName, idx) => {
+                const cleanTName = tName.replace(/\*/g, '').trim();
+                const dbTest = (fullDatabase.tests || []).find(t => t && t.name && t.name.replace(/\*/g, '').trim().toUpperCase() === cleanTName.toUpperCase());
+                const testParams = dbTest && dbTest.parameters ? dbTest.parameters : [{ name: cleanTName, unit: '-', range: '-' }];
+                const sTName = safeKey(cleanTName);
+                const oldSTName = safeKey(tName);
+
+                bodyHtml += `<table class="rep-main-table"><thead><tr><th width="40%">Test Name</th><th width="20%">Result</th><th width="15%">Unit</th><th width="25%">Ref Range</th></tr></thead><tbody>`;
+
+                if (cleanTName.toUpperCase().includes('WIDAL')) {
+                    bodyHtml += `<tr><td colspan="4" class="test-category-title">${cleanTName.toUpperCase()}</td></tr>`;
+                    let wHtml = `<table style="width:100%; border-collapse:collapse; margin:10px 0 15px 0; text-align:center; font-size:12px; border:1.5px solid #000;"><tr style="background:#f9f9f9; font-weight:bold; border-bottom:1.5px solid #000;"><td style="padding:6px; text-align:left; border-right:1.5px solid #000; width:30%;">Antigen</td><td style="border-right:1px solid #000;">1:20</td><td style="border-right:1px solid #000;">1:40</td><td style="border-right:1px solid #000;">1:80</td><td style="border-right:1px solid #000;">1:160</td><td>1:320</td></tr>`;
+                    let impText = '';
+                    testParams.forEach(param => {
+                        const sPName = safeKey(param.name);
+                        let ex = (p.test_results && p.test_results[sTName]) ? p.test_results[sTName][sPName] : undefined;
+                        if (ex === undefined) ex = (p.test_results && p.test_results[oldSTName]) ? p.test_results[oldSTName][sPName] : undefined;
+                        const val = (ex && typeof ex === 'object') ? ex.v : (ex || '');
+                        if (param.name.toUpperCase().includes('IMPRESSION') || param.name.toUpperCase().includes('REMARK')) {
+                            impText = val;
+                        } else {
+                            const v = String(val).toLowerCase();
+                            let m = ['-', '-', '-', '-', '-'];
+                            if (v.includes('320')) m = ['+', '+', '+', '+', '+'];
+                            else if (v.includes('160')) m = ['+', '+', '+', '+', '-'];
+                            else if (v.includes('80')) m = ['+', '+', '+', '-', '-'];
+                            else if (v.includes('40')) m = ['+', '+', '-', '-', '-'];
+                            else if (v.includes('20')) m = ['+', '-', '-', '-', '-'];
+                            else if (v.includes('pos')) m = ['+', '+', '+', '-', '-'];
+                            wHtml += `<tr style="border-bottom:1px solid #000;"><td style="padding:5px; text-align:left; font-weight:600; border-right:1.5px solid #000;">${param.name}</td><td style="border-right:1px solid #000;">${m[0]}</td><td style="border-right:1px solid #000;">${m[1]}</td><td style="border-right:1px solid #000;">${m[2]}</td><td style="border-right:1px solid #000;">${m[3]}</td><td>${m[4]}</td></tr>`;
+                        }
+                    });
+                    wHtml += `</table>`;
+                    if (impText) wHtml += `<div style="margin-bottom:15px; font-size:13px; font-weight:bold;">WIDAL IMPRESSION: &nbsp;&nbsp;&nbsp; ${impText}</div>`;
+                    bodyHtml += `<tr><td colspan="4" style="padding:0;">${wHtml}</td></tr>`;
+                } else {
+                    let catAdded = false;
+                    testParams.forEach(param => {
+                        if (param.name.trim().startsWith('#')) {
+                            const hText = param.name.replace('#', '').trim();
+                            bodyHtml += `<tr><td colspan="4" style="background:#E0F2FE; color:#1E3A8A; font-weight:bold; padding:6px 8px; border-top:1px solid #CBD5E1; border-bottom:1px solid #CBD5E1; font-size:13px; text-transform:uppercase;">${hText}</td></tr>`;
+                            return;
+                        }
+                        const sPName = safeKey(param.name);
+                        let ex = (p.test_results && p.test_results[sTName]) ? p.test_results[sTName][sPName] : undefined;
+                        if (ex === undefined) ex = (p.test_results && p.test_results[oldSTName]) ? p.test_results[oldSTName][sPName] : undefined;
+                        let val = '', unit = param.unit || '', range = param.range || '', isAb = false, isPrint = true;
+                        if (ex !== undefined && ex !== null) {
+                            if (typeof ex === 'object') {
+                                val = ex.v !== undefined ? ex.v : '';
+                                unit = ex.u !== undefined ? ex.u : unit;
+                                range = ex.r !== undefined ? ex.r : range;
+                                isAb = ex.a || false;
+                                isPrint = ex.p !== undefined ? ex.p : true;
+                            } else {
+                                val = String(ex);
+                            }
+                        }
+                        if (!isPrint) return;
+                        if (!catAdded) {
+                            bodyHtml += `<tr><td colspan="4" class="test-category-title">${cleanTName.toUpperCase()}</td></tr>`;
+                            catAdded = true;
+                        }
+                        const dispRes = val ? (isAb ? `<span class="abnormal-print">${val}</span>` : `<b>${val}</b>`) : '-';
+                        bodyHtml += `<tr><td style="font-weight:500;">${param.name}</td><td>${dispRes}</td><td>${unit}</td><td>${range}</td></tr>`;
+                    });
+                }
+
+                bodyHtml += `</tbody></table>`;
+
+                if (getSavedIncludeNote(p, sTName, oldSTName) && dbTest && dbTest.clinical_note && dbTest.clinical_note.trim() !== '') {
+                    bodyHtml += `<div class="clinical-note-box">${formatClinicalNote(dbTest.clinical_note)}</div>`;
+                }
+
+                if (idx === selTests.length - 1) {
+                    bodyHtml += buildEndSignFooterHtml();
+                }
+            });
+
+            const PAGE_W = 794;
+            const PAGE_H = 1123;
+            const MM_TO_PX = PAGE_W / 210;
+            const sidePad = Math.round(10 * MM_TO_PX);
+            const topPad = Math.round(tMargin * MM_TO_PX);
+            const botPad = Math.round(bMargin * MM_TO_PX);
+            const usableH = Math.max(420, PAGE_H - topPad - botPad);
+
+            const measurer = document.createElement('div');
+            measurer.style.position = 'absolute';
+            measurer.style.left = '-9999px';
+            measurer.style.top = '0';
+            measurer.style.width = (PAGE_W - sidePad * 2) + 'px';
+            measurer.style.background = '#fff';
+            document.body.appendChild(measurer);
+
+            const temp = document.createElement('div');
+            temp.innerHTML = bodyHtml;
+            const blocks = Array.from(temp.children);
+
+            function makePage() {
+                const page = document.createElement('div');
+                page.style.width = PAGE_W + 'px';
+                page.style.height = PAGE_H + 'px';
+                page.style.position = 'relative';
+                page.style.background = '#fff';
+                page.style.overflow = 'hidden';
+                page.style.boxSizing = 'border-box';
+
+                if (lhImgSrc) {
+                    const img = document.createElement('img');
+                    img.src = lhImgSrc;
+                    img.style.position = 'absolute';
+                    img.style.top = '0';
+                    img.style.left = '0';
+                    img.style.width = PAGE_W + 'px';
+                    img.style.height = PAGE_H + 'px';
+                    img.style.objectFit = 'cover';
+                    img.style.zIndex = '0';
+                    page.appendChild(img);
+                }
+
+                const inner = document.createElement('div');
+                inner.style.position = 'relative';
+                inner.style.zIndex = '1';
+                inner.style.marginTop = topPad + 'px';
+                inner.style.marginLeft = sidePad + 'px';
+                inner.style.marginRight = sidePad + 'px';
+                inner.style.height = usableH + 'px';
+                inner.style.maxHeight = usableH + 'px';
+                inner.style.overflow = 'hidden';
+                page.appendChild(inner);
+                return { page, inner };
+            }
+
+            let pages = [];
+            let cur = makePage();
+            let usedH = 0;
+
+            blocks.forEach(blk => {
+                const clone = blk.cloneNode(true);
+                measurer.innerHTML = '';
+                measurer.appendChild(clone.cloneNode(true));
+                const h = Math.ceil(measurer.getBoundingClientRect().height || measurer.offsetHeight || 20);
+                if (usedH > 0 && (usedH + h) > usableH) {
+                    pages.push(cur.page);
+                    cur = makePage();
+                    usedH = 0;
+                }
+                cur.inner.appendChild(clone);
+                usedH += h;
+            });
+
+            if (cur.inner.children.length > 0 || pages.length === 0) pages.push(cur.page);
+            document.body.removeChild(measurer);
+
+            const container = document.getElementById('mobilePdfPagesContainer');
+            container.innerHTML = '';
+            container.style.width = PAGE_W + 'px';
+            container.style.background = '#fff';
+            pages.forEach(pg => container.appendChild(pg));
+
+            const imgs = Array.from(container.querySelectorAll('img'));
+            await Promise.all(imgs.map(waitForImg));
+            document.getElementById('statusMsg').innerText = 'Ready. Tap "Download as PDF (Mobile)" below.';
+        }
+
+        async function downloadPdfNow() {
+            const target = document.getElementById('mobilePdfPagesContainer');
+            if (!target || !target.children.length) return;
+            document.getElementById('statusMsg').innerText = '⏳ Generating PDF... Please keep screen on.';
+            try {
+                await html2pdf().set({
+                    margin: 0,
+                    filename: reportFileName,
+                    image: { type: 'jpeg', quality: 0.85 },
+                    html2canvas: { scale: 1.25, useCORS: true, allowTaint: true, scrollY: 0, logging: false },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                }).from(target).save();
+                document.getElementById('statusMsg').innerText = '✅ PDF Downloaded!';
+            } catch (e) {
+                console.error(e);
+                document.getElementById('statusMsg').innerText = 'Error generating PDF. Try again.';
+            }
+        }
+
+        window.onload = buildMobilePages;
+    </script>
+</body>
+</html>
