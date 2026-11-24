@@ -15,36 +15,36 @@
         #pdfStageWrap { width: 100%; overflow-x: auto; }
         .fallback-header { display: flex; align-items: center; border-bottom: 3px solid #F57C00; padding-bottom: 8px; margin-bottom: 10px; }
         .fallback-header h1 { margin: 0; color: #000080; font-size: 20px; }
-        .rep-info-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; border: 2px solid #000; }
-        .rep-info-table td.box-cell { padding: 12px 15px; vertical-align: top; border: 1px solid #000; }
-        .inner-info { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.6; }
-        .inner-info td { border: none !important; padding: 2px 0; }
+        .rep-info-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; border: 2px solid #000; }
+        .rep-info-table td.box-cell { padding: 10px 14px; vertical-align: top; border: 1px solid #000; }
+        .inner-info { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 1.5; }
+        .inner-info td { border: none !important; padding: 1px 0; }
         .inner-lbl { width: 110px; font-weight: bold; }
         .inner-colon { width: 15px; font-weight: bold; }
-        .rep-main-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 12px; }
-        .rep-main-table th { border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 6px 8px; text-align: left; background-color: #f9f9f9; font-size: 13px; }
-        .rep-main-table td { padding: 5px 8px; line-height: 1.4; }
+        .rep-main-table { width: 100%; border-collapse: collapse; margin-bottom: 0; font-size: 12px; }
+        .rep-main-table th { border-bottom: 1.5px solid #000; border-top: 1.5px solid #000; padding: 5px 8px; text-align: left; background-color: #f9f9f9; font-size: 12.5px; }
+        .rep-main-table td { padding: 4px 8px; line-height: 1.35; }
         .abnormal-print { color: #DC2626; font-weight: 900; }
         .test-category-title {
             text-align: center;
             background-color: #E2E8F0;
             color: #1E293B;
             font-weight: 800;
-            font-size: 15px;
-            padding: 10px;
+            font-size: 14px;
+            padding: 8px;
             text-transform: uppercase;
             border: 1px solid #CBD5E1;
             border-left: none;
             border-right: none;
         }
-        .clinical-note-box { padding: 8px; border-top: 1px solid #CBD5E1; font-size: 11px; line-height: 1.45; color: #1E293B; }
-        .clinical-note-line { line-height: 1.45; }
-        .report-sign-footer-block { margin-top: 18px; padding-top: 6px; }
-        .sign-row-table { width: 100%; border-collapse: collapse; margin-top: 22px; font-size: 11px; color: #111827; }
+        .clinical-note-box { padding: 6px 8px 4px 8px; margin-top: 0; margin-bottom: 8px; border-top: 1px solid #CBD5E1; font-size: 11px; line-height: 1.4; color: #1E293B; }
+        .note-chunk { margin-bottom: 2px; text-align: justify; }
+        .report-sign-footer-block { margin-top: 10px; padding-top: 4px; }
+        .sign-row-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 11px; color: #111827; }
         .sign-cell-left { width: 50%; text-align: left; vertical-align: bottom; padding-right: 12px; }
         .sign-cell-right { width: 50%; text-align: right; vertical-align: bottom; padding-left: 12px; }
         .sign-line-box { display: inline-block; min-width: 190px; border-top: 1px solid #111827; padding-top: 5px; font-weight: 700; }
-        .end-of-report-center { text-align: center; padding-top: 18px; padding-bottom: 8px; font-weight: bold; font-size: 12px; color: #333; }
+        .end-of-report-center { text-align: center; padding-top: 14px; padding-bottom: 6px; font-weight: bold; font-size: 12px; color: #333; }
     </style>
 </head>
 <body>
@@ -81,34 +81,101 @@
             return false;
         }
 
-        function formatClinicalNote(text) {
-            if (!text) return '';
-            let lines = text.split('\n');
-            let html = '';
+        // Split long lines into smaller sentence/word segments so notes can split cleanly mid-note across pages
+        function splitLongTextIntoChunks(text, maxChars = 145) {
+            const clean = text.trim();
+            if (!clean) return [];
+            if (clean.length <= maxChars) return [clean];
+
+            const sentences = clean.match(/[^.!?]+[.!?]+(?=\s|$)|[^.!?]+$/g) || [clean];
+            const chunks = [];
+            let current = '';
+
+            sentences.forEach(s => {
+                const part = s.trim();
+                if (!part) return;
+                if (part.length > maxChars) {
+                    const words = part.split(/\s+/);
+                    let wBuf = '';
+                    words.forEach(w => {
+                        if ((wBuf + ' ' + w).trim().length > maxChars) {
+                            if (wBuf.trim()) chunks.push(wBuf.trim());
+                            wBuf = w;
+                        } else {
+                            wBuf = (wBuf + ' ' + w).trim();
+                        }
+                    });
+                    if (wBuf.trim()) {
+                        if ((current + ' ' + wBuf).trim().length <= maxChars) {
+                            current = (current + ' ' + wBuf).trim();
+                        } else {
+                            if (current) chunks.push(current);
+                            current = wBuf.trim();
+                        }
+                    }
+                } else if ((current + ' ' + part).trim().length <= maxChars) {
+                    current = (current + ' ' + part).trim();
+                } else {
+                    if (current) chunks.push(current);
+                    current = part;
+                }
+            });
+
+            if (current) chunks.push(current);
+            return chunks;
+        }
+
+        function buildNoteChunkItems(text) {
+            if (!text) return [];
+            const lines = text.split('\n');
+            const items = [];
             let inTable = false;
+            let tableHtml = '';
+
             lines.forEach(line => {
-                let trimmed = line.trim();
+                const trimmed = line.trim();
                 if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
-                    let cells = trimmed.slice(1, -1).split('|').map(c => c.trim());
+                    const cells = trimmed.slice(1, -1).split('|').map(c => c.trim());
                     if (!inTable) {
                         inTable = true;
-                        html += `<table style="width:100%; max-width:520px; border-collapse:collapse; margin:6px 0 10px 0; font-size:11px; border:1px solid #000;">`;
-                        html += `<tr class="clinical-note-line" style="background:#F1F5F9; font-weight:bold;">` + cells.map(c => `<td style="border:1px solid #000; padding:4px 6px;">${c}</td>`).join('') + `</tr>`;
+                        tableHtml = `<table style="width:100%; max-width:520px; border-collapse:collapse; margin:4px 0 6px 0; font-size:11px; border:1px solid #000;"><tr style="background:#F1F5F9; font-weight:bold;">` + cells.map(c => `<td style="border:1px solid #000; padding:3px 6px;">${c}</td>`).join('') + `</tr>`;
                     } else {
-                        html += `<tr class="clinical-note-line">` + cells.map(c => `<td style="border:1px solid #000; padding:4px 6px;">${c}</td>`).join('') + `</tr>`;
+                        tableHtml += `<tr>` + cells.map(c => `<td style="border:1px solid #000; padding:3px 6px;">${c}</td>`).join('') + `</tr>`;
                     }
                 } else {
-                    if (inTable) { html += `</table>`; inTable = false; }
+                    if (inTable) {
+                        tableHtml += `</table>`;
+                        items.push(tableHtml);
+                        tableHtml = '';
+                        inTable = false;
+                    }
                     if (trimmed === '') {
-                        html += `<div class="clinical-note-line" style="height:6px;"></div>`;
+                        items.push(`<div class="note-chunk" style="height:4px;"></div>`);
                     } else {
-                        let formatted = trimmed.replace(/^(Reference Range|Clinical Significance|Method|Note|Interpretation|Remark)(:?)/i, '<b>$1$2</b>');
-                        html += `<div class="clinical-note-line" style="margin-bottom:2px; text-align:justify;">${formatted}</div>`;
+                        const prefixMatch = trimmed.match(/^(Reference Range|Clinical Significance|Method|Note|Interpretation|Remark)(:?)\s*(.*)$/i);
+                        if (prefixMatch) {
+                            const label = `<b>${prefixMatch[1]}${prefixMatch[2]}</b>`;
+                            const rest = (prefixMatch[3] || '').trim();
+                            items.push(`<div class="note-chunk">${label}</div>`);
+                            if (rest) {
+                                splitLongTextIntoChunks(rest).forEach(ch => {
+                                    items.push(`<div class="note-chunk">${ch}</div>`);
+                                });
+                            }
+                        } else {
+                            splitLongTextIntoChunks(trimmed).forEach(ch => {
+                                items.push(`<div class="note-chunk">${ch}</div>`);
+                            });
+                        }
                     }
                 }
             });
-            if (inTable) html += `</table>`;
-            return html;
+
+            if (inTable) {
+                tableHtml += `</table>`;
+                items.push(tableHtml);
+            }
+            return items;
         }
 
         function buildEndSignFooterHtml() {
@@ -170,108 +237,6 @@
                 if (dp.length === 3) repDateText = `${dp[2]}-${dp[1]}-${dp[0]}`;
             }
 
-            let bodyHtml = `
-                ${lhImgSrc ? '' : `<div class="fallback-header"><div><h1>${(fullDatabase.lab_name || 'SL DIAGNOSTIC CENTER').toUpperCase()}</h1></div></div>`}
-                <table class="rep-info-table">
-                    <tr>
-                        <td width="50%" class="box-cell">
-                            <table class="inner-info">
-                                <tr><td class="inner-lbl">Patient Name</td><td class="inner-colon">:</td><td><b>${(p.name || '-').toUpperCase()}</b></td></tr>
-                                <tr><td class="inner-lbl">Age / Sex</td><td class="inner-colon">:</td><td>${p.age || '-'} Y / ${p.gender || '-'}</td></tr>
-                                <tr><td class="inner-lbl">Referred By</td><td class="inner-colon">:</td><td>${p.doctor || 'Self'}</td></tr>
-                            </table>
-                        </td>
-                        <td width="50%" class="box-cell">
-                            <table class="inner-info">
-                                <tr><td class="inner-lbl" style="width:130px;">Report Lab ID</td><td class="inner-colon">:</td><td><b>${p.lab_no || 'N/A'}</b></td></tr>
-                                <tr><td class="inner-lbl">Sample Date</td><td class="inner-colon">:</td><td>${p.date || ''}</td></tr>
-                                <tr><td class="inner-lbl">Report Date</td><td class="inner-colon">:</td><td>${repDateText}</td></tr>
-                            </table>
-                        </td>
-                    </tr>
-                </table>
-            `;
-
-            const selTests = p.selected_tests || [];
-            selTests.forEach((tName, idx) => {
-                const cleanTName = tName.replace(/\*/g, '').trim();
-                const dbTest = (fullDatabase.tests || []).find(t => t && t.name && t.name.replace(/\*/g, '').trim().toUpperCase() === cleanTName.toUpperCase());
-                const testParams = dbTest && dbTest.parameters ? dbTest.parameters : [{ name: cleanTName, unit: '-', range: '-' }];
-                const sTName = safeKey(cleanTName);
-                const oldSTName = safeKey(tName);
-
-                bodyHtml += `<table class="rep-main-table"><thead><tr><th width="40%">Test Name</th><th width="20%">Result</th><th width="15%">Unit</th><th width="25%">Ref Range</th></tr></thead><tbody>`;
-
-                if (cleanTName.toUpperCase().includes('WIDAL')) {
-                    bodyHtml += `<tr><td colspan="4" class="test-category-title">${cleanTName.toUpperCase()}</td></tr>`;
-                    let wHtml = `<table style="width:100%; border-collapse:collapse; margin:10px 0 15px 0; text-align:center; font-size:12px; border:1.5px solid #000;"><tr style="background:#f9f9f9; font-weight:bold; border-bottom:1.5px solid #000;"><td style="padding:6px; text-align:left; border-right:1.5px solid #000; width:30%;">Antigen</td><td style="border-right:1px solid #000;">1:20</td><td style="border-right:1px solid #000;">1:40</td><td style="border-right:1px solid #000;">1:80</td><td style="border-right:1px solid #000;">1:160</td><td>1:320</td></tr>`;
-                    let impText = '';
-                    testParams.forEach(param => {
-                        const sPName = safeKey(param.name);
-                        let ex = (p.test_results && p.test_results[sTName]) ? p.test_results[sTName][sPName] : undefined;
-                        if (ex === undefined) ex = (p.test_results && p.test_results[oldSTName]) ? p.test_results[oldSTName][sPName] : undefined;
-                        const val = (ex && typeof ex === 'object') ? ex.v : (ex || '');
-                        if (param.name.toUpperCase().includes('IMPRESSION') || param.name.toUpperCase().includes('REMARK')) {
-                            impText = val;
-                        } else {
-                            const v = String(val).toLowerCase();
-                            let m = ['-', '-', '-', '-', '-'];
-                            if (v.includes('320')) m = ['+', '+', '+', '+', '+'];
-                            else if (v.includes('160')) m = ['+', '+', '+', '+', '-'];
-                            else if (v.includes('80')) m = ['+', '+', '+', '-', '-'];
-                            else if (v.includes('40')) m = ['+', '+', '-', '-', '-'];
-                            else if (v.includes('20')) m = ['+', '-', '-', '-', '-'];
-                            else if (v.includes('pos')) m = ['+', '+', '+', '-', '-'];
-                            wHtml += `<tr style="border-bottom:1px solid #000;"><td style="padding:5px; text-align:left; font-weight:600; border-right:1.5px solid #000;">${param.name}</td><td style="border-right:1px solid #000;">${m[0]}</td><td style="border-right:1px solid #000;">${m[1]}</td><td style="border-right:1px solid #000;">${m[2]}</td><td style="border-right:1px solid #000;">${m[3]}</td><td>${m[4]}</td></tr>`;
-                        }
-                    });
-                    wHtml += `</table>`;
-                    if (impText) wHtml += `<div style="margin-bottom:15px; font-size:13px; font-weight:bold;">WIDAL IMPRESSION: &nbsp;&nbsp;&nbsp; ${impText}</div>`;
-                    bodyHtml += `<tr><td colspan="4" style="padding:0;">${wHtml}</td></tr>`;
-                } else {
-                    let catAdded = false;
-                    testParams.forEach(param => {
-                        if (param.name.trim().startsWith('#')) {
-                            const hText = param.name.replace('#', '').trim();
-                            bodyHtml += `<tr><td colspan="4" style="background:#E0F2FE; color:#1E3A8A; font-weight:bold; padding:6px 8px; border-top:1px solid #CBD5E1; border-bottom:1px solid #CBD5E1; font-size:13px; text-transform:uppercase;">${hText}</td></tr>`;
-                            return;
-                        }
-                        const sPName = safeKey(param.name);
-                        let ex = (p.test_results && p.test_results[sTName]) ? p.test_results[sTName][sPName] : undefined;
-                        if (ex === undefined) ex = (p.test_results && p.test_results[oldSTName]) ? p.test_results[oldSTName][sPName] : undefined;
-                        let val = '', unit = param.unit || '', range = param.range || '', isAb = false, isPrint = true;
-                        if (ex !== undefined && ex !== null) {
-                            if (typeof ex === 'object') {
-                                val = ex.v !== undefined ? ex.v : '';
-                                unit = ex.u !== undefined ? ex.u : unit;
-                                range = ex.r !== undefined ? ex.r : range;
-                                isAb = ex.a || false;
-                                isPrint = ex.p !== undefined ? ex.p : true;
-                            } else {
-                                val = String(ex);
-                            }
-                        }
-                        if (!isPrint) return;
-                        if (!catAdded) {
-                            bodyHtml += `<tr><td colspan="4" class="test-category-title">${cleanTName.toUpperCase()}</td></tr>`;
-                            catAdded = true;
-                        }
-                        const dispRes = val ? (isAb ? `<span class="abnormal-print">${val}</span>` : `<b>${val}</b>`) : '-';
-                        bodyHtml += `<tr><td style="font-weight:500;">${param.name}</td><td>${dispRes}</td><td>${unit}</td><td>${range}</td></tr>`;
-                    });
-                }
-
-                bodyHtml += `</tbody></table>`;
-
-                if (getSavedIncludeNote(p, sTName, oldSTName) && dbTest && dbTest.clinical_note && dbTest.clinical_note.trim() !== '') {
-                    bodyHtml += `<div class="clinical-note-box">${formatClinicalNote(dbTest.clinical_note)}</div>`;
-                }
-
-                if (idx === selTests.length - 1) {
-                    bodyHtml += buildEndSignFooterHtml();
-                }
-            });
-
             const PAGE_W = 794;
             const PAGE_H = 1123;
             const MM_TO_PX = PAGE_W / 210;
@@ -286,37 +251,13 @@
             measurer.style.top = '0';
             measurer.style.width = (PAGE_W - sidePad * 2) + 'px';
             measurer.style.background = '#fff';
+            measurer.style.fontFamily = "'Poppins', sans-serif";
             document.body.appendChild(measurer);
 
-            const temp = document.createElement('div');
-            temp.innerHTML = bodyHtml;
-
-            // Break long clinical notes into individual lines so half goes to current page and rest continues cleanly on next page
-            const blocks = [];
-            Array.from(temp.children).forEach(child => {
-                if (child.classList && child.classList.contains('clinical-note-box')) {
-                    const noteLines = Array.from(child.querySelectorAll('.clinical-note-line'));
-                    if (noteLines.length > 0) {
-                        noteLines.forEach((nLine, lIdx) => {
-                            const wrapLine = document.createElement('div');
-                            wrapLine.style.fontSize = '11px';
-                            wrapLine.style.lineHeight = '1.45';
-                            wrapLine.style.color = '#1E293B';
-                            wrapLine.style.padding = '0 8px';
-                            if (lIdx === 0) {
-                                wrapLine.style.borderTop = '1px solid #CBD5E1';
-                                wrapLine.style.paddingTop = '6px';
-                            }
-                            wrapLine.appendChild(nLine.cloneNode(true));
-                            blocks.push(wrapLine);
-                        });
-                    } else {
-                        blocks.push(child.cloneNode(true));
-                    }
-                } else {
-                    blocks.push(child.cloneNode(true));
-                }
-            });
+            function measureHtmlHeight(htmlStr) {
+                measurer.innerHTML = htmlStr;
+                return Math.ceil(measurer.getBoundingClientRect().height || measurer.offsetHeight || 20);
+            }
 
             function makePage() {
                 const page = document.createElement('div');
@@ -355,18 +296,129 @@
             let cur = makePage();
             let usedH = 0;
 
-            blocks.forEach(blk => {
-                const clone = blk.cloneNode(true);
-                measurer.innerHTML = '';
-                measurer.appendChild(clone.cloneNode(true));
-                const h = Math.ceil(measurer.getBoundingClientRect().height || measurer.offsetHeight || 20);
+            function appendPiece(htmlStr) {
+                const h = measureHtmlHeight(htmlStr);
                 if (usedH > 0 && (usedH + h) > usableH) {
                     pages.push(cur.page);
                     cur = makePage();
                     usedH = 0;
                 }
-                cur.inner.appendChild(clone);
+                const holder = document.createElement('div');
+                holder.innerHTML = htmlStr;
+                while (holder.firstChild) {
+                    cur.inner.appendChild(holder.firstChild);
+                }
                 usedH += h;
+            }
+
+            if (!lhImgSrc) {
+                appendPiece(`<div class="fallback-header"><div><h1>${(fullDatabase.lab_name || 'SL DIAGNOSTIC CENTER').toUpperCase()}</h1></div></div>`);
+            }
+
+            appendPiece(`
+                <table class="rep-info-table">
+                    <tr>
+                        <td width="50%" class="box-cell">
+                            <table class="inner-info">
+                                <tr><td class="inner-lbl">Patient Name</td><td class="inner-colon">:</td><td><b>${(p.name || '-').toUpperCase()}</b></td></tr>
+                                <tr><td class="inner-lbl">Age / Sex</td><td class="inner-colon">:</td><td>${p.age || '-'} Y / ${p.gender || '-'}</td></tr>
+                                <tr><td class="inner-lbl">Referred By</td><td class="inner-colon">:</td><td>${p.doctor || 'Self'}</td></tr>
+                            </table>
+                        </td>
+                        <td width="50%" class="box-cell">
+                            <table class="inner-info">
+                                <tr><td class="inner-lbl" style="width:130px;">Report Lab ID</td><td class="inner-colon">:</td><td><b>${p.lab_no || 'N/A'}</b></td></tr>
+                                <tr><td class="inner-lbl">Sample Date</td><td class="inner-colon">:</td><td>${p.date || ''}</td></tr>
+                                <tr><td class="inner-lbl">Report Date</td><td class="inner-colon">:</td><td>${repDateText}</td></tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            `);
+
+            const selTests = p.selected_tests || [];
+            selTests.forEach((tName, idx) => {
+                const cleanTName = tName.replace(/\*/g, '').trim();
+                const dbTest = (fullDatabase.tests || []).find(t => t && t.name && t.name.replace(/\*/g, '').trim().toUpperCase() === cleanTName.toUpperCase());
+                const testParams = dbTest && dbTest.parameters ? dbTest.parameters : [{ name: cleanTName, unit: '-', range: '-' }];
+                const sTName = safeKey(cleanTName);
+                const oldSTName = safeKey(tName);
+
+                let tblHtml = `<table class="rep-main-table"><thead><tr><th width="40%">Test Name</th><th width="20%">Result</th><th width="15%">Unit</th><th width="25%">Ref Range</th></tr></thead><tbody>`;
+
+                if (cleanTName.toUpperCase().includes('WIDAL')) {
+                    tblHtml += `<tr><td colspan="4" class="test-category-title">${cleanTName.toUpperCase()}</td></tr>`;
+                    let wHtml = `<table style="width:100%; border-collapse:collapse; margin:6px 0 8px 0; text-align:center; font-size:12px; border:1.5px solid #000;"><tr style="background:#f9f9f9; font-weight:bold; border-bottom:1.5px solid #000;"><td style="padding:5px; text-align:left; border-right:1.5px solid #000; width:30%;">Antigen</td><td style="border-right:1px solid #000;">1:20</td><td style="border-right:1px solid #000;">1:40</td><td style="border-right:1px solid #000;">1:80</td><td style="border-right:1px solid #000;">1:160</td><td>1:320</td></tr>`;
+                    let impText = '';
+                    testParams.forEach(param => {
+                        const sPName = safeKey(param.name);
+                        let ex = (p.test_results && p.test_results[sTName]) ? p.test_results[sTName][sPName] : undefined;
+                        if (ex === undefined) ex = (p.test_results && p.test_results[oldSTName]) ? p.test_results[oldSTName][sPName] : undefined;
+                        const val = (ex && typeof ex === 'object') ? ex.v : (ex || '');
+                        if (param.name.toUpperCase().includes('IMPRESSION') || param.name.toUpperCase().includes('REMARK')) {
+                            impText = val;
+                        } else {
+                            const v = String(val).toLowerCase();
+                            let m = ['-', '-', '-', '-', '-'];
+                            if (v.includes('320')) m = ['+', '+', '+', '+', '+'];
+                            else if (v.includes('160')) m = ['+', '+', '+', '+', '-'];
+                            else if (v.includes('80')) m = ['+', '+', '+', '-', '-'];
+                            else if (v.includes('40')) m = ['+', '+', '-', '-', '-'];
+                            else if (v.includes('20')) m = ['+', '-', '-', '-', '-'];
+                            else if (v.includes('pos')) m = ['+', '+', '+', '-', '-'];
+                            wHtml += `<tr style="border-bottom:1px solid #000;"><td style="padding:4px 5px; text-align:left; font-weight:600; border-right:1.5px solid #000;">${param.name}</td><td style="border-right:1px solid #000;">${m[0]}</td><td style="border-right:1px solid #000;">${m[1]}</td><td style="border-right:1px solid #000;">${m[2]}</td><td style="border-right:1px solid #000;">${m[3]}</td><td>${m[4]}</td></tr>`;
+                        }
+                    });
+                    wHtml += `</table>`;
+                    if (impText) wHtml += `<div style="margin-bottom:6px; font-size:12.5px; font-weight:bold;">WIDAL IMPRESSION: &nbsp;&nbsp;&nbsp; ${impText}</div>`;
+                    tblHtml += `<tr><td colspan="4" style="padding:0;">${wHtml}</td></tr>`;
+                } else {
+                    let catAdded = false;
+                    testParams.forEach(param => {
+                        if (param.name.trim().startsWith('#')) {
+                            const hText = param.name.replace('#', '').trim();
+                            tblHtml += `<tr><td colspan="4" style="background:#E0F2FE; color:#1E3A8A; font-weight:bold; padding:5px 8px; border-top:1px solid #CBD5E1; border-bottom:1px solid #CBD5E1; font-size:12.5px; text-transform:uppercase;">${hText}</td></tr>`;
+                            return;
+                        }
+                        const sPName = safeKey(param.name);
+                        let ex = (p.test_results && p.test_results[sTName]) ? p.test_results[sTName][sPName] : undefined;
+                        if (ex === undefined) ex = (p.test_results && p.test_results[oldSTName]) ? p.test_results[oldSTName][sPName] : undefined;
+                        let val = '', unit = param.unit || '', range = param.range || '', isAb = false, isPrint = true;
+                        if (ex !== undefined && ex !== null) {
+                            if (typeof ex === 'object') {
+                                val = ex.v !== undefined ? ex.v : '';
+                                unit = ex.u !== undefined ? ex.u : unit;
+                                range = ex.r !== undefined ? ex.r : range;
+                                isAb = ex.a || false;
+                                isPrint = ex.p !== undefined ? ex.p : true;
+                            } else {
+                                val = String(ex);
+                            }
+                        }
+                        if (!isPrint) return;
+                        if (!catAdded) {
+                            tblHtml += `<tr><td colspan="4" class="test-category-title">${cleanTName.toUpperCase()}</td></tr>`;
+                            catAdded = true;
+                        }
+                        const dispRes = val ? (isAb ? `<span class="abnormal-print">${val}</span>` : `<b>${val}</b>`) : '-';
+                        tblHtml += `<tr><td style="font-weight:500;">${param.name}</td><td>${dispRes}</td><td>${unit}</td><td>${range}</td></tr>`;
+                    });
+                }
+
+                tblHtml += `</tbody></table>`;
+                appendPiece(tblHtml);
+
+                if (getSavedIncludeNote(p, sTName, oldSTName) && dbTest && dbTest.clinical_note && dbTest.clinical_note.trim() !== '') {
+                    const noteItems = buildNoteChunkItems(dbTest.clinical_note);
+                    noteItems.forEach((nHtml, nIdx) => {
+                        const topBorderStyle = nIdx === 0 ? 'border-top:1px solid #CBD5E1; padding-top:5px;' : 'border-top:none; padding-top:0;';
+                        appendPiece(`<div class="clinical-note-box" style="margin-bottom:2px; padding-bottom:2px; ${topBorderStyle}">${nHtml}</div>`);
+                    });
+                }
+
+                if (idx === selTests.length - 1) {
+                    appendPiece(buildEndSignFooterHtml());
+                }
             });
 
             if (cur.inner.children.length > 0 || pages.length === 0) pages.push(cur.page);
