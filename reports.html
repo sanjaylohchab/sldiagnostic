@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reports Manager - Premium</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     
     <style>
         :root {
@@ -112,7 +111,7 @@
 
         .btn-save-rep { background: var(--done); color: white; border: none; padding: 14px; font-weight: 700; font-size: 15px; border-radius: 10px; width: 100%; cursor: pointer; margin-top: 10px;}
         .btn-print-final { background: var(--accent); color: white; border: none; padding: 12px; font-weight: 700; font-size: 14px; border-radius: 8px; width: 100%; cursor: pointer; margin-top: 15px;}
-        .btn-pdf-final { background: #8B5CF6; color: white; border: none; padding: 12px; font-weight: 700; font-size: 14px; border-radius: 8px; width: 100%; cursor: pointer; margin-top: 10px;}
+        .btn-pdf-mobile-link { background: #8B5CF6; color: white; border: none; padding: 12px; font-weight: 700; font-size: 14px; border-radius: 8px; width: 100%; cursor: pointer; margin-top: 10px;}
         .btn-add-new { background: var(--primary); color: white; border: none; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 18px; line-height: 1;}
 
         #loading { text-align: center; color: var(--accent); font-weight: bold; padding: 20px; display: none;}
@@ -299,7 +298,7 @@
                 </div>
 
                 <button class="btn-print-final" onclick="executeNativePrint()">🖨️ Print Report</button>
-                <button class="btn-pdf-final" onclick="downloadMobilePDF()">📥 Download Perfect PDF</button>
+                <button class="btn-pdf-mobile-link" onclick="openMobilePdfPage()">📥 Download as PDF (Mobile)</button>
                 
                 <input type="file" id="uploadLh" accept="image/*" style="display:none;" onchange="handleNewUpload(event)">
             </div>
@@ -780,11 +779,8 @@
                         <table style="width:100%; border-collapse: collapse; margin:10px 0 15px 0; text-align:center; font-size:12px; border: 1.5px solid #000;">
                             <tr style="background:#f9f9f9; font-weight:bold; border-bottom: 1.5px solid #000;">
                                 <td style="padding:6px; text-align:left; border-right: 1.5px solid #000; width:30%;">Antigen</td>
-                                <td style="border-right: 1px solid #000;">1:20</td>
-                                <td style="border-right: 1px solid #000;">1:40</td>
-                                <td style="border-right: 1px solid #000;">1:80</td>
-                                <td style="border-right: 1px solid #000;">1:160</td>
-                                <td>1:320</td>
+                                <td style="border-right: 1px solid #000;">1:20</td><td style="border-right: 1px solid #000;">1:40</td>
+                                <td style="border-right: 1px solid #000;">1:80</td><td style="border-right: 1px solid #000;">1:160</td><td>1:320</td>
                             </tr>
                         `;
 
@@ -891,6 +887,16 @@
                 textHeader.style.display = 'flex';
             }
         }
+
+        function waitForImageReady(imgEl) {
+            return new Promise(resolve => {
+                if (!imgEl || !imgEl.src) return resolve();
+                if (imgEl.complete && imgEl.naturalWidth > 0) return resolve();
+                imgEl.onload = () => resolve();
+                imgEl.onerror = () => resolve();
+                setTimeout(resolve, 4000);
+            });
+        }
         
         async function executeNativePrint() {
             let p = fullDatabase.patients && fullDatabase.patients[printingPtIndex];
@@ -904,308 +910,14 @@
             setTimeout(() => { window.print(); }, 250);
         }
 
-        function isMobileDevice() {
-            return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || window.innerWidth <= 768;
-        }
-
-        function waitForImageReady(imgEl) {
-            return new Promise(resolve => {
-                if (!imgEl || !imgEl.src) return resolve();
-                if (imgEl.complete && imgEl.naturalWidth > 0) return resolve();
-                imgEl.onload = () => resolve();
-                imgEl.onerror = () => resolve();
-                setTimeout(resolve, 4000);
-            });
-        }
-
-        async function downloadMobilePDF() {
-            let auditPatient = fullDatabase.patients && fullDatabase.patients[printingPtIndex];
-            if (auditPatient) recordAudit(`Downloaded PDF report for ${auditPatient.name || 'patient'}`, 'report');
-            if (typeof html2pdf === 'undefined') {
-                alert("⏳ PDF Library is still loading... Please wait 2 seconds and click again.");
-                return;
-            }
-
+        function openMobilePdfPage() {
+            if (printingPtIndex < 0) return;
+            const lhVal = encodeURIComponent(document.getElementById('cfgLetterhead').value || '');
+            const topVal = encodeURIComponent(document.getElementById('cfgTopMargin').value || '45');
+            const botVal = encodeURIComponent(document.getElementById('cfgBottomMargin').value || '30');
+            const repDateVal = encodeURIComponent(document.getElementById('cfgReportDate').value || '');
             closeModal('printConfigOverlay');
-            setupPrintView();
-
-            let pName = (document.getElementById('prName').innerText || 'Patient_Report').replace(/[^a-zA-Z0-9_-]/g, '_');
-            let tMargin = parseInt(document.getElementById('cfgTopMargin').value) || 45;
-            let bMargin = parseInt(document.getElementById('cfgBottomMargin').value) || 30;
-
-            let lhImgSrc = document.getElementById('prLetterheadImg').src;
-            let showLh = document.getElementById('prLetterheadImg').style.display !== 'none';
-            let showTextHeader = document.getElementById('prTextHeader').style.display !== 'none';
-            const onPhone = isMobileDevice();
-
-            let overlay = document.createElement('div');
-            overlay.style.position = 'fixed';
-            overlay.style.top = '0';
-            overlay.style.left = '0';
-            overlay.style.width = '100%';
-            overlay.style.height = '100%';
-            overlay.style.overflow = 'auto';
-            overlay.style.backgroundColor = '#F1F5F9';
-            overlay.style.zIndex = '999999';
-            overlay.style.padding = '16px 10px';
-            overlay.style.boxSizing = 'border-box';
-
-            let loadMsg = document.createElement('h2');
-            loadMsg.style.textAlign = 'center';
-            loadMsg.style.color = '#2563EB';
-            loadMsg.style.fontFamily = 'sans-serif';
-            loadMsg.style.fontSize = '15px';
-            loadMsg.style.margin = '6px 0 12px 0';
-            loadMsg.innerText = onPhone
-                ? '⏳ फ़ोन में PDF तैयार हो रही है (10-15 सेकंड लग सकते हैं)... स्क्रीन खुली रखें।'
-                : '⏳ Generating Perfect PDF... Please wait.';
-            overlay.appendChild(loadMsg);
-
-            const PAGE_W_PX = 794;
-            const PAGE_H_PX = 1123;
-            const MM_TO_PX = PAGE_W_PX / 210;
-            const sidePadPx = Math.round(10 * MM_TO_PX);
-            const topPadPx = Math.round(tMargin * MM_TO_PX);
-            const botPadPx = Math.round(bMargin * MM_TO_PX);
-            const usableHeightPx = Math.max(420, PAGE_H_PX - topPadPx - botPadPx);
-
-            let measureContainer = document.createElement('div');
-            measureContainer.style.position = 'absolute';
-            measureContainer.style.left = '-9999px';
-            measureContainer.style.top = '0';
-            measureContainer.style.width = (PAGE_W_PX - sidePadPx * 2) + 'px';
-            measureContainer.style.backgroundColor = '#ffffff';
-            measureContainer.style.color = '#000000';
-            measureContainer.style.fontFamily = "'Poppins', sans-serif";
-            document.body.appendChild(measureContainer);
-
-            let contentNode = document.getElementById('printContentWrapper').cloneNode(true);
-            contentNode.style.display = 'block';
-            contentNode.style.padding = '0';
-            let clonedTextHeader = contentNode.querySelector('#prTextHeader');
-            if (clonedTextHeader) {
-                clonedTextHeader.style.display = showTextHeader ? 'flex' : 'none';
-            }
-
-            let blocks = [];
-            const headerEl = contentNode.querySelector('#prTextHeader');
-            if (headerEl && headerEl.style.display !== 'none') blocks.push(headerEl.cloneNode(true));
-
-            const infoTable = contentNode.querySelector('.rep-info-table');
-            if (infoTable) blocks.push(infoTable.cloneNode(true));
-
-            const dynArea = contentNode.querySelector('#sl-dynamic-report');
-            if (dynArea) {
-                Array.from(dynArea.children).forEach(child => {
-                    if (child.tagName === 'TABLE' && child.classList.contains('rep-main-table')) {
-                        let thead = child.querySelector('thead');
-                        let tbody = child.querySelector('tbody');
-                        let rows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
-                        if (rows.length > 0) {
-                            let group = [];
-                            rows.forEach((tr) => {
-                                let isCatTitle = !!tr.querySelector('.test-category-title');
-                                if (isCatTitle && group.length > 0) {
-                                    blocks.push({ type: 'tableGroup', theadHtml: thead ? thead.outerHTML : '', rows: group, style: child.getAttribute('style') || '' });
-                                    group = [tr.outerHTML];
-                                } else {
-                                    group.push(tr.outerHTML);
-                                }
-                            });
-                            if (group.length > 0) {
-                                blocks.push({ type: 'tableGroup', theadHtml: thead ? thead.outerHTML : '', rows: group, style: child.getAttribute('style') || '' });
-                            }
-                        } else {
-                            blocks.push({ type: 'element', el: child.cloneNode(true) });
-                        }
-                    } else if (child.classList && child.classList.contains('clinical-note-box')) {
-                        let lines = child.querySelectorAll('.clinical-note-line');
-                        if (lines.length > 0) {
-                            lines.forEach((lineEl, lIdx) => {
-                                let lineWrapper = document.createElement('div');
-                                lineWrapper.style.fontSize = '11px';
-                                lineWrapper.style.lineHeight = '1.45';
-                                lineWrapper.style.color = '#1E293B';
-                                lineWrapper.style.padding = '0 8px';
-                                if (lIdx === 0) {
-                                    lineWrapper.style.borderTop = '1px solid #CBD5E1';
-                                    lineWrapper.style.paddingTop = '6px';
-                                }
-                                lineWrapper.appendChild(lineEl.cloneNode(true));
-                                blocks.push({ type: 'element', el: lineWrapper });
-                            });
-                        } else {
-                            blocks.push({ type: 'element', el: child.cloneNode(true) });
-                        }
-                    } else {
-                        blocks.push({ type: 'element', el: child.cloneNode(true) });
-                    }
-                });
-            }
-
-            function buildTableElement(groupObj, sliceRows) {
-                let tbl = document.createElement('table');
-                tbl.className = 'rep-main-table';
-                tbl.setAttribute('style', (groupObj.style || 'width:100%; border-collapse:collapse; margin-bottom:10px; font-size:12px;'));
-                tbl.innerHTML = `${groupObj.theadHtml || ''}<tbody>${sliceRows.join('')}</tbody>`;
-                return tbl;
-            }
-
-            function createPageElement() {
-                let pageEl = document.createElement('div');
-                pageEl.style.width = PAGE_W_PX + 'px';
-                pageEl.style.height = PAGE_H_PX + 'px';
-                pageEl.style.position = 'relative';
-                pageEl.style.backgroundColor = '#ffffff';
-                pageEl.style.color = '#000000';
-                pageEl.style.boxSizing = 'border-box';
-                pageEl.style.overflow = 'hidden';
-
-                if (showLh && lhImgSrc) {
-                    let bgImg = document.createElement('img');
-                    bgImg.src = lhImgSrc;
-                    bgImg.style.position = 'absolute';
-                    bgImg.style.top = '0';
-                    bgImg.style.left = '0';
-                    bgImg.style.width = PAGE_W_PX + 'px';
-                    bgImg.style.height = PAGE_H_PX + 'px';
-                    bgImg.style.objectFit = 'cover';
-                    bgImg.style.zIndex = '0';
-                    bgImg.style.pointerEvents = 'none';
-                    pageEl.appendChild(bgImg);
-                }
-
-                let innerArea = document.createElement('div');
-                innerArea.style.position = 'relative';
-                innerArea.style.zIndex = '1';
-                innerArea.style.marginTop = topPadPx + 'px';
-                innerArea.style.marginLeft = sidePadPx + 'px';
-                innerArea.style.marginRight = sidePadPx + 'px';
-                innerArea.style.height = usableHeightPx + 'px';
-                innerArea.style.maxHeight = usableHeightPx + 'px';
-                innerArea.style.overflow = 'hidden';
-                innerArea.style.boxSizing = 'border-box';
-
-                pageEl.appendChild(innerArea);
-                return { pageEl, innerArea };
-            }
-
-            function measureHeight(node) {
-                measureContainer.innerHTML = '';
-                measureContainer.appendChild(node);
-                return Math.ceil(node.getBoundingClientRect().height || node.offsetHeight || 20);
-            }
-
-            let pages = [];
-            let current = createPageElement();
-            let currentUsedHeight = 0;
-
-            for (let i = 0; i < blocks.length; i++) {
-                let item = blocks[i];
-
-                if (item.type === 'tableGroup') {
-                    let pendingRows = [...item.rows];
-                    while (pendingRows.length > 0) {
-                        let remaining = usableHeightPx - currentUsedHeight;
-                        let testSample = buildTableElement(item, [pendingRows[0]]);
-                        let firstRowH = measureHeight(testSample);
-
-                        if (currentUsedHeight > 0 && remaining < firstRowH) {
-                            pages.push(current.pageEl);
-                            current = createPageElement();
-                            currentUsedHeight = 0;
-                            remaining = usableHeightPx;
-                        }
-
-                        let fitRows = [];
-                        for (let r = 0; r < pendingRows.length; r++) {
-                            let candidateRows = [...fitRows, pendingRows[r]];
-                            let candidateTbl = buildTableElement(item, candidateRows);
-                            let h = measureHeight(candidateTbl);
-                            if (h <= remaining || fitRows.length === 0) {
-                                fitRows = candidateRows;
-                            } else {
-                                break;
-                            }
-                        }
-
-                        let placedTbl = buildTableElement(item, fitRows);
-                        let placedH = measureHeight(placedTbl);
-                        current.innerArea.appendChild(placedTbl);
-                        currentUsedHeight += placedH;
-                        pendingRows = pendingRows.slice(fitRows.length);
-
-                        if (pendingRows.length > 0) {
-                            pages.push(current.pageEl);
-                            current = createPageElement();
-                            currentUsedHeight = 0;
-                        }
-                    }
-                } else {
-                    let blk = item.el;
-                    let blkHeight = measureHeight(blk.cloneNode(true));
-
-                    if (currentUsedHeight > 0 && (currentUsedHeight + blkHeight) > usableHeightPx) {
-                        pages.push(current.pageEl);
-                        current = createPageElement();
-                        currentUsedHeight = 0;
-                    }
-
-                    current.innerArea.appendChild(blk);
-                    currentUsedHeight += blkHeight;
-                }
-            }
-
-            if (current.innerArea.children.length > 0 || pages.length === 0) {
-                pages.push(current.pageEl);
-            }
-
-            document.body.removeChild(measureContainer);
-
-            let pdfWrapper = document.createElement('div');
-            pdfWrapper.id = 'pdfGenWrapper';
-            pdfWrapper.style.width = PAGE_W_PX + 'px';
-            pdfWrapper.style.margin = '0 auto';
-            pages.forEach(pEl => pdfWrapper.appendChild(pEl));
-
-            if (showLh && lhImgSrc) {
-                overlay.style.opacity = '0';
-                document.body.appendChild(overlay);
-            }
-
-            if (!document.body.contains(overlay)) {
-                overlay.appendChild(pdfWrapper);
-                document.body.appendChild(overlay);
-            } else {
-                overlay.appendChild(pdfWrapper);
-            }
-
-            window.scrollTo(0, 0);
-
-            if (showLh && lhImgSrc) {
-                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-                let allBgImgs = Array.from(pdfWrapper.querySelectorAll('img'));
-                await Promise.all(allBgImgs.map(waitForImageReady));
-                overlay.style.opacity = '1';
-            }
-
-            let opt = {
-                margin:       0,
-                filename:     pName + '_Lab_Report.pdf',
-                image:        { type: 'jpeg', quality: onPhone ? 0.85 : 1 },
-                html2canvas:  { scale: onPhone ? 1.25 : 2, useCORS: true, allowTaint: true, scrollY: 0, logging: false },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
-
-            try {
-                await html2pdf().set(opt).from(pdfWrapper).save();
-                if (document.body.contains(overlay)) document.body.removeChild(overlay);
-                alert("✅ PDF Downloaded Successfully!");
-            } catch (err) {
-                console.error(err);
-                if (document.body.contains(overlay)) document.body.removeChild(overlay);
-                alert("❌ PDF बनाने में दिक्कत आई—कृपया एक बार फिर से Download Perfect PDF दबाएँ।");
-            }
+            window.location.href = `report_mobile.html?pt_idx=${printingPtIndex}&lh=${lhVal}&top=${topVal}&bot=${botVal}&rep_date=${repDateVal}`;
         }
 
         window.onload = init;
